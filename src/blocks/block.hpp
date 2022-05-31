@@ -5,7 +5,7 @@
 
 class BlockType {
     public:
-        static const float textureSize = 1.0 / 16.0;
+        static constexpr float textureSize = 1.0 / 16.0;
         const bool isSolid;
         const bool isOpaque;
 
