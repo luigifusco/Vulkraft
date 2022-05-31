@@ -2,84 +2,12 @@
 #include <vector>
 #include <map>
 
+#include "blocks/block.hpp"
+#include "utils/enums.cpp"
+
 const int CHUNK_HEIGHT = 16;
 const int CHUNK_WIDTH = 16;
 const int CHUNK_DEPTH = 16;
-
-enum BlockType {
-    Air = 0,
-    Grass,
-	Dirt,
-	Log,
-    Glass,
-};
-
-enum Direction {
-	Up,
-	Down,
-	North,
-	East,
-	South,
-	West,
-};
-
-glm::ivec2 purge(Direction dir, glm::ivec3 coords) {
-	switch(dir) {
-		case Direction::Up: 
-			return glm::ivec2(coords.x, coords.z);
-		case Direction::Down: 
-			return glm::ivec2((coords.x + 1) % 2, coords.z);
-		case Direction::North: 
-			return glm::ivec2(coords.x, (coords.y + 1) % 2);
-		case Direction::South:
-			return glm::ivec2((coords.x + 1) % 2, (coords.y + 1) % 2);
-		case Direction::East: 
-			return glm::ivec2((coords.z + 1) % 2, (coords.y + 1) % 2);
-		case Direction::West:
-			return glm::ivec2(coords.z, (coords.y + 1) % 2);
-	}
-}
-
-glm::vec2 textureOffset(BlockType type, Direction dir, glm::vec3 corner) {
-	static float size = 1.0 / 16.0;
-	glm::vec2 fileOffset;
-	glm::vec2 blockOffset = purge(dir, corner);
-	
-	switch(type) {
-		case BlockType::Grass:
-			switch(dir) {
-				case Direction::Up:
-					fileOffset = glm::vec2(0, 0);	// TODO: wtf
-					break;
-				case Direction::Down:
-					fileOffset = glm::vec2(2, 0);
-					break;
-				default:
-					fileOffset = glm::vec2(3, 0);
-					break;
-			}
-			break;
-		case BlockType::Dirt:
-			fileOffset = glm::vec2(2, 0);
-			break;
-		case BlockType::Log:
-			switch(dir) {
-				case Direction::Up:
-				case Direction::Down:
-					fileOffset = glm::vec2(5, 1);
-					break;
-				default:
-					fileOffset = glm::vec2(4, 1);
-					break;
-			}
-			break;
-		case BlockType::Air:
-		default:
-			return glm::vec2(15, 15);
-	}
-
-	return (fileOffset + blockOffset) * size;
-}
 
 struct BlockVertex {
     glm::vec3 pos;
@@ -93,7 +21,7 @@ struct BlockFace {
 };
 
 struct Block {
-    BlockType type;
+    BlockType *type;
 
 	static inline std::map<Direction, BlockFace> faces = {
 		{Direction::Down, {glm::vec3(0, 0, 0), glm::vec3(1, 0, 0), glm::vec3(1, 0, 1), glm::vec3(0, 0, 1), glm::vec3(0, -1, 0)}},
@@ -105,11 +33,16 @@ struct Block {
 	};
 
     Block() {
-		type = static_cast<BlockType>(rand() % 4);
-    }
-
-    bool isOpaque() {
-        return !(type == BlockType::Air || type == BlockType::Glass);
+        switch(rand() % 4) {
+            case 0:
+                type = new Air();
+            case 1:
+                type = new Dirt();
+            case 2:
+                type = new Grass();
+            case 3:
+                type = new Log();
+        }
     }
 };
 
@@ -122,14 +55,14 @@ class Chunk {
 
 		std::vector<Direction> getVisibleFaces(int x, int y, int z) {
 			Block block = blocks[x][y][z];
-			if(block.type == BlockType::Air) return {};
+			if(!block.type->isVisible()) return {};
 			std::vector<Direction> faces;
-			if(x == 0 || !blocks[x - 1][y][z].isOpaque()) faces.push_back(Direction::West);
-			if(y == 0 || !blocks[x][y - 1][z].isOpaque()) faces.push_back(Direction::Down);
-			if(z == 0 || !blocks[x][y][z - 1].isOpaque()) faces.push_back(Direction::South);
-			if(x == CHUNK_WIDTH - 1 || !blocks[x + 1][y][z].isOpaque()) faces.push_back(Direction::East);
-			if(y == CHUNK_HEIGHT - 1 || !blocks[x][y + 1][z].isOpaque()) faces.push_back(Direction::Up);
-			if(z == CHUNK_DEPTH - 1 || !blocks[x][y][z + 1].isOpaque()) faces.push_back(Direction::North);
+			if(x == 0 || !blocks[x - 1][y][z].type->isOpaque) faces.push_back(Direction::West);
+			if(y == 0 || !blocks[x][y - 1][z].type->isOpaque) faces.push_back(Direction::Down);
+			if(z == 0 || !blocks[x][y][z - 1].type->isOpaque) faces.push_back(Direction::South);
+			if(x == CHUNK_WIDTH - 1 || !blocks[x + 1][y][z].type->isOpaque) faces.push_back(Direction::East);
+			if(y == CHUNK_HEIGHT - 1 || !blocks[x][y + 1][z].type->isOpaque) faces.push_back(Direction::Up);
+			if(z == CHUNK_DEPTH - 1 || !blocks[x][y][z + 1].type->isOpaque) faces.push_back(Direction::North);
 			return faces;
 		}
 
@@ -139,10 +72,10 @@ class Chunk {
 			glm::ivec3 pos = coordinates + glm::ivec3(x, y, z);
 			int index = vertices.size();
 
-			vertices.push_back({pos + face.a, face.norm, textureOffset(block.type, dir, face.a)});
-			vertices.push_back({pos + face.b, face.norm, textureOffset(block.type, dir, face.b)});
-			vertices.push_back({pos + face.c, face.norm, textureOffset(block.type, dir, face.c)});
-			vertices.push_back({pos + face.d, face.norm, textureOffset(block.type, dir, face.d)});
+			vertices.push_back({pos + face.a, face.norm, block.type->getTextureOffset(dir, face.a)});
+			vertices.push_back({pos + face.b, face.norm, block.type->getTextureOffset(dir, face.b)});
+			vertices.push_back({pos + face.c, face.norm, block.type->getTextureOffset(dir, face.c)});
+			vertices.push_back({pos + face.d, face.norm, block.type->getTextureOffset(dir, face.d)});
 
 			indices.push_back(index + 0);
 			indices.push_back(index + 1);
