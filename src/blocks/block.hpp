@@ -45,9 +45,51 @@ class Grass : public BlockType {
         glm::ivec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
 };
 
-class Log : public BlockType {
+class WoodLog : public BlockType {
     public:
-        Log() : BlockType(true, true) {};
+        WoodLog() : BlockType(true, true) {};
+
+        glm::ivec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
+};
+
+class WoodPlank : public BlockType {
+    public:
+        WoodPlank() : BlockType(true, true) {};
+
+        glm::ivec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
+};
+
+class Stone : public BlockType {
+    public:
+        Stone() : BlockType(true, true) {};
+
+        glm::ivec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
+};
+
+class Cobblestone : public BlockType {
+    public:
+        Cobblestone() : BlockType(true, true) {};
+
+        glm::ivec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
+};
+
+class Sand : public BlockType {
+    public:
+        Sand() : BlockType(true, true) {};
+
+        glm::ivec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
+};
+
+class Gravel : public BlockType {
+    public:
+        Gravel() : BlockType(true, true) {};
+
+        glm::ivec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
+};
+
+class Bedrock : public BlockType {
+    public:
+        Bedrock() : BlockType(true, true) {};
 
         glm::ivec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
 };
