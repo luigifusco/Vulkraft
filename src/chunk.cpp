@@ -1,31 +1,111 @@
-#include "glm.hpp"
+#include <glm/glm.hpp>
 #include <vector>
+#include <map>
 
-const int CHUNK_HEIGHT = 256;
-const int CHUNK_WIDTH = 256;
-const int CHUNK_DEPTH = 256;
-
-
-void makeRectangle(int* arr, int o, int a, int b, int c, int d) {
-	arr[o+0] = a;
-	arr[o+1] = b;
-	arr[o+2] = c;
-	arr[o+3] = a;
-	arr[o+4] = c;
-	arr[o+5] = d;
-}
+const int CHUNK_HEIGHT = 16;
+const int CHUNK_WIDTH = 16;
+const int CHUNK_DEPTH = 16;
 
 enum BlockType {
     Air = 0,
     Grass,
-    Glass
+	Dirt,
+	Log,
+    Glass,
+};
+
+enum Direction {
+	Up,
+	Down,
+	North,
+	East,
+	South,
+	West,
+};
+
+glm::ivec2 purge(Direction dir, glm::ivec3 coords) {
+	switch(dir) {
+		case Direction::Up: 
+			return glm::ivec2(coords.x, coords.z);
+		case Direction::Down: 
+			return glm::ivec2((coords.x + 1) % 2, coords.z);
+		case Direction::North: 
+			return glm::ivec2(coords.x, (coords.y + 1) % 2);
+		case Direction::South:
+			return glm::ivec2((coords.x + 1) % 2, (coords.y + 1) % 2);
+		case Direction::East: 
+			return glm::ivec2((coords.z + 1) % 2, (coords.y + 1) % 2);
+		case Direction::West:
+			return glm::ivec2(coords.z, (coords.y + 1) % 2);
+	}
+}
+
+glm::vec2 textureOffset(BlockType type, Direction dir, glm::vec3 corner) {
+	static float size = 1.0 / 16.0;
+	glm::vec2 fileOffset;
+	glm::vec2 blockOffset = purge(dir, corner);
+	
+	switch(type) {
+		case BlockType::Grass:
+			switch(dir) {
+				case Direction::Up:
+					fileOffset = glm::vec2(0, 0);	// TODO: wtf
+					break;
+				case Direction::Down:
+					fileOffset = glm::vec2(2, 0);
+					break;
+				default:
+					fileOffset = glm::vec2(3, 0);
+					break;
+			}
+			break;
+		case BlockType::Dirt:
+			fileOffset = glm::vec2(2, 0);
+			break;
+		case BlockType::Log:
+			switch(dir) {
+				case Direction::Up:
+				case Direction::Down:
+					fileOffset = glm::vec2(5, 1);
+					break;
+				default:
+					fileOffset = glm::vec2(4, 1);
+					break;
+			}
+			break;
+		case BlockType::Air:
+		default:
+			return glm::vec2(15, 15);
+	}
+
+	return (fileOffset + blockOffset) * size;
+}
+
+struct BlockVertex {
+    glm::vec3 pos;
+	glm::vec3 norm;
+    glm::vec2 tex;
+};
+
+struct BlockFace {
+	glm::ivec3 a, b, c, d;
+	glm::vec3 norm;
 };
 
 struct Block {
     BlockType type;
 
+	static inline std::map<Direction, BlockFace> faces = {
+		{Direction::Down, {glm::vec3(0, 0, 0), glm::vec3(1, 0, 0), glm::vec3(1, 0, 1), glm::vec3(0, 0, 1), glm::vec3(0, -1, 0)}},
+		{Direction::Up, {glm::vec3(0, 1, 0), glm::vec3(1, 1, 0), glm::vec3(1, 1, 1), glm::vec3(0, 1, 1), glm::vec3(0, +1, 0)}},
+		{Direction::South, {glm::vec3(0, 0, 0), glm::vec3(1, 0, 0), glm::vec3(1, 1, 0), glm::vec3(0, 1, 0), glm::vec3(0, 0, -1)}},
+		{Direction::North, {glm::vec3(1, 0, 1), glm::vec3(0, 0, 1), glm::vec3(0, 1, 1), glm::vec3(1, 1, 1), glm::vec3(0, 0, +1)}},
+		{Direction::East, {glm::vec3(1, 0, 0), glm::vec3(1, 0, 1), glm::vec3(1, 1, 1), glm::vec3(1, 1, 0), glm::vec3(+1, 0, 0)}},
+		{Direction::West, {glm::vec3(0, 0, 0), glm::vec3(0, 0, 1), glm::vec3(0, 1, 1), glm::vec3(0, 1, 0), glm::vec3(-1, 0, 0)}},
+	};
+
     Block() {
-        type = BlockType::Air;
+		type = static_cast<BlockType>(rand() % 4);
     }
 
     bool isOpaque() {
@@ -33,57 +113,74 @@ struct Block {
     }
 };
 
-struct BlockData {
-    unsigned char x, y, z, type;
-};
-
-struct BlockVertex {
-    glm::vec3 pos;
-    glm::vec2 tex;
-};
-
 class Chunk {
     private:
         Block blocks[CHUNK_WIDTH][CHUNK_HEIGHT][CHUNK_DEPTH];
         glm::ivec3 coordinates;
-        std::vector<BlockData> chunk_data;
-        std::vector<BlockVertex> chunk_graphics_vert;
-        std::vector<int> chunk_graphics_idx;
+        std::vector<BlockVertex> vertices;
+        std::vector<int> indices;
 
+		std::vector<Direction> getVisibleFaces(int x, int y, int z) {
+			Block block = blocks[x][y][z];
+			if(block.type == BlockType::Air) return {};
+			std::vector<Direction> faces;
+			if(x == 0 || !blocks[x - 1][y][z].isOpaque()) faces.push_back(Direction::West);
+			if(y == 0 || !blocks[x][y - 1][z].isOpaque()) faces.push_back(Direction::Down);
+			if(z == 0 || !blocks[x][y][z - 1].isOpaque()) faces.push_back(Direction::South);
+			if(x == CHUNK_WIDTH - 1 || !blocks[x + 1][y][z].isOpaque()) faces.push_back(Direction::East);
+			if(y == CHUNK_HEIGHT - 1 || !blocks[x][y + 1][z].isOpaque()) faces.push_back(Direction::Up);
+			if(z == CHUNK_DEPTH - 1 || !blocks[x][y][z + 1].isOpaque()) faces.push_back(Direction::North);
+			return faces;
+		}
+
+		void buildBlockFace(int x, int y, int z, Direction dir) {
+			Block block = blocks[x][y][z];
+			BlockFace face = block.faces[dir];
+			glm::ivec3 pos = coordinates + glm::ivec3(x, y, z);
+			int index = vertices.size();
+
+			vertices.push_back({pos + face.a, face.norm, textureOffset(block.type, dir, face.a)});
+			vertices.push_back({pos + face.b, face.norm, textureOffset(block.type, dir, face.b)});
+			vertices.push_back({pos + face.c, face.norm, textureOffset(block.type, dir, face.c)});
+			vertices.push_back({pos + face.d, face.norm, textureOffset(block.type, dir, face.d)});
+
+			indices.push_back(index + 0);
+			indices.push_back(index + 1);
+			indices.push_back(index + 2);
+			indices.push_back(index + 0);
+			indices.push_back(index + 2);
+			indices.push_back(index + 3);
+		}
+	
+		void buildBlock(int x, int y, int z) {
+			std::vector<Direction> visibleFaces = getVisibleFaces(x, y, z);
+			for(const Direction &dir : visibleFaces) {
+				buildBlockFace(x, y, z, dir);
+			}
+		}
 
     public:
         Chunk(int x, int y, int z) {
-            coordinates = glm::vec3(x, y, z);
+            coordinates = glm::ivec3(x, y, z);
         }
 
+		std::vector<BlockVertex> getVertices() {
+			return vertices;
+		}
+
+		std::vector<int> getIndices() {
+			return indices;
+		}
+
         void build() {
-            chunk_data.clear();
+            vertices.clear();
+            indices.clear();
             for (int x = 0; x < CHUNK_WIDTH; ++x) {
                 for (int y = 0; y < CHUNK_HEIGHT; ++y) {
                     for (int z = 0; z < CHUNK_DEPTH; ++z) {
-                        Block b = blocks[x][y][z];
-                        if (b.type != BlockType::Air) {
-                            BlockData d = {x, y, z, b.type};
-                            chunk_data.push_back(d);
-                        }
+						buildBlock(x, y, z);
                     }
                 }
-            }
-        }
-
-        void buildGraphics() {
-            build();
-            chunk_graphics_vert.clear();
-            chunk_graphics_idx.clear();
-            idx_offset = 0;
-            for (BlockData &b : chunk_data) {
-                glm::vec3 blockPos(coordinates.x+b.x, coordinates.y+b.y, coordinates.z+b.z);
-                makeRectangle(M1_indices.data(), 0, 0, 1, 2, 3);
-                makeRectangle(M1_indices.data(), 6, 4, 5, 6, 7);
-                makeRectangle(M1_indices.data(), 12, 0, 1, 5, 4);
-                makeRectangle(M1_indices.data(), 18, 2, 3, 7, 6);
-                makeRectangle(M1_indices.data(), 24, 1, 2, 6, 5);
-                makeRectangle(M1_indices.data(), 30, 0, 3, 7, 4);               
             }
         }
 };
