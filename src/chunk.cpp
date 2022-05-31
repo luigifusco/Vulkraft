@@ -41,7 +41,7 @@ struct Block {
             case 2:
                 type = new Grass();
             case 3:
-                type = new Log();
+                type = new WoodLog();
         }
     }
 };
