@@ -207,6 +207,10 @@ private:
     std::vector<VkFence> inFlightFences;
     uint32_t currentFrame = 0;
 
+    glm::mat3 CamDir = glm::mat3(1.0f);
+	glm::vec3 CamPos = glm::vec3(0.0f, 0.5f, 2.5f);
+	glm::vec3 CamAng = glm::vec3(0.0f, 0.0f, 0.0f);
+
     bool framebufferResized = false;
 
     void initWindow() {
@@ -260,6 +264,121 @@ private:
 
         vkDeviceWaitIdle(device);
     }
+
+    void updateUniformBuffer(uint32_t currentImage) {
+		static auto startTime = std::chrono::high_resolution_clock::now();
+		static float lastTime = 0.0f;
+		
+		auto currentTime = std::chrono::high_resolution_clock::now();
+		float time = std::chrono::duration<float, std::chrono::seconds::period>
+					(currentTime - startTime).count();
+		float deltaT = time - lastTime;
+		lastTime = time;
+					
+		static float debounce = time;
+		
+		if(glfwGetKey(window, GLFW_KEY_SPACE)) {
+			if(time - debounce > 0.33) {
+		//		curText = (curText + 1) % SceneText.size();
+				debounce = time;
+				framebufferResized = true;
+			}
+		}			
+		if(glfwGetKey(window, GLFW_KEY_X)) {
+			if(time - debounce > 0.33) {
+		//		xray = !xray;
+				debounce = time;
+				framebufferResized = true;
+			}
+		}
+
+
+		const float ROT_SPEED = glm::radians(60.0f);
+		const float MOVE_SPEED = 1.25f;
+		const float MOUSE_RES = 500.0f;
+		
+		static double old_xpos = 0, old_ypos = 0;
+		double xpos, ypos;
+		glfwGetCursorPos(window, &xpos, &ypos);
+		double m_dx = xpos - old_xpos;
+		double m_dy = ypos - old_ypos;
+		old_xpos = xpos; old_ypos = ypos;
+//std::cout << xpos << " " << ypos << " " << m_dx << " " << m_dy << "\n";
+
+		glfwSetInputMode(window, GLFW_STICKY_MOUSE_BUTTONS, GLFW_TRUE);
+		if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+			CamAng.y += m_dx * ROT_SPEED / MOUSE_RES;
+			CamAng.x += m_dy * ROT_SPEED / MOUSE_RES;
+		}
+
+		if(glfwGetKey(window, GLFW_KEY_LEFT)) {
+			CamAng.y += deltaT * ROT_SPEED;
+		}
+		if(glfwGetKey(window, GLFW_KEY_RIGHT)) {
+			CamAng.y -= deltaT * ROT_SPEED;
+		}
+		if(glfwGetKey(window, GLFW_KEY_UP)) {
+			CamAng.x += deltaT * ROT_SPEED;
+		}
+		if(glfwGetKey(window, GLFW_KEY_DOWN)) {
+			CamAng.x -= deltaT * ROT_SPEED;
+		}
+		if(glfwGetKey(window, GLFW_KEY_Q)) {
+			CamAng.z -= deltaT * ROT_SPEED;
+		}
+		if(glfwGetKey(window, GLFW_KEY_E)) {
+			CamAng.z += deltaT * ROT_SPEED;
+		}
+		
+		glm::mat3 CamDir = glm::mat3(glm::rotate(glm::mat4(1.0f), CamAng.y, glm::vec3(0.0f, 1.0f, 0.0f))) *
+						   glm::mat3(glm::rotate(glm::mat4(1.0f), CamAng.x, glm::vec3(1.0f, 0.0f, 0.0f))) *
+						   glm::mat3(glm::rotate(glm::mat4(1.0f), CamAng.z, glm::vec3(0.0f, 0.0f, 1.0f)));
+		
+		
+		if(glfwGetKey(window, GLFW_KEY_A)) {
+			CamPos -= MOVE_SPEED * glm::vec3(glm::rotate(glm::mat4(1.0f), CamAng.y,
+									glm::vec3(0.0f, 1.0f, 0.0f)) * glm::vec4(1,0,0,1)) * deltaT;
+		}
+		if(glfwGetKey(window, GLFW_KEY_D)) {
+			CamPos += MOVE_SPEED * glm::vec3(glm::rotate(glm::mat4(1.0f), CamAng.y,
+									glm::vec3(0.0f, 1.0f, 0.0f)) * glm::vec4(1,0,0,1)) * deltaT;
+		}
+		if(glfwGetKey(window, GLFW_KEY_S)) {
+			CamPos += MOVE_SPEED * glm::vec3(glm::rotate(glm::mat4(1.0f), CamAng.y,
+									glm::vec3(0.0f, 1.0f, 0.0f)) * glm::vec4(0,0,1,1)) * deltaT;
+		}
+		if(glfwGetKey(window, GLFW_KEY_W)) {
+			CamPos -= MOVE_SPEED * glm::vec3(glm::rotate(glm::mat4(1.0f), CamAng.y,
+									glm::vec3(0.0f, 1.0f, 0.0f)) * glm::vec4(0,0,1,1)) * deltaT;
+		}
+		if(glfwGetKey(window, GLFW_KEY_F)) {
+			CamPos -= MOVE_SPEED * glm::vec3(0,1,0) * deltaT;
+		}
+		if(glfwGetKey(window, GLFW_KEY_R)) {
+			CamPos += MOVE_SPEED * glm::vec3(0,1,0) * deltaT;
+		}
+// std::cout << "Cam Pos: " << CamPos[0] << " " << CamPos[1] << " " << CamPos[2] << "\n";
+
+		glm::mat4 CamMat = glm::translate(glm::transpose(glm::mat4(CamDir)), -CamPos);
+					
+		glm::mat4 Prj = glm::perspective(glm::radians(45.0f),
+						swapChainExtent.width / (float) swapChainExtent.height,
+						0.1f, 50.0f);
+		Prj[1][1] *= -1;
+	
+		// updates global uniforms
+		UniformBufferObject ubo{};
+        ubo.model = glm::mat4(1.0f);
+        //ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.view = CamMat;
+        ubo.proj = Prj;
+
+		void* data;
+		vkMapMemory(device, uniformBuffersMemory[currentImage], 0,
+							sizeof(ubo), 0, &data);
+		memcpy(data, &ubo, sizeof(ubo));
+		vkUnmapMemory(device, uniformBuffersMemory[currentImage]);
+	}
 
     void cleanupSwapChain() {
         vkDestroyImageView(device, depthImageView, nullptr);
@@ -1452,24 +1571,6 @@ private:
                 throw std::runtime_error("failed to create synchronization objects for a frame!");
             }
         }
-    }
-
-    void updateUniformBuffer(uint32_t currentImage) {
-        static auto startTime = std::chrono::high_resolution_clock::now();
-
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-
-        UniformBufferObject ubo{};
-        ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-        ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-        ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f, 10.0f);
-        ubo.proj[1][1] *= -1;
-
-        void* data;
-        vkMapMemory(device, uniformBuffersMemory[currentImage], 0, sizeof(ubo), 0, &data);
-            memcpy(data, &ubo, sizeof(ubo));
-        vkUnmapMemory(device, uniformBuffersMemory[currentImage]);
     }
 
     void drawFrame() {
