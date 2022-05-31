@@ -10,7 +10,11 @@ add_subdirectory(headers)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY  ${CMAKE_CURRENT_BINARY_DIR}/bin)
 
-add_executable(main main.cpp)
+file(GLOB_RECURSE sources src/*.cpp src/*.hpp)
+
+
+
+add_executable(main ${sources})
 
 add_custom_command(TARGET main PRE_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/shaders $<TARGET_FILE_DIR:main>/shaders)
 add_custom_command(TARGET main PRE_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/models $<TARGET_FILE_DIR:main>/models)

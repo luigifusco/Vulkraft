@@ -1,7 +1,7 @@
 #pragma once
 
 #include <glm/glm.hpp>
-#include "../utils/enums.cpp"
+#include "../utils/enums.hpp"
 
 class BlockType {
     public:

@@ -3,7 +3,7 @@
 #include <map>
 
 #include "blocks/block.hpp"
-#include "utils/enums.cpp"
+#include "utils/enums.hpp"
 
 const int CHUNK_HEIGHT = 16;
 const int CHUNK_WIDTH = 16;
