@@ -17,17 +17,19 @@ glm::ivec2 BlockType::purge(Direction dir, glm::ivec3 coords) {
     }
 }
 
-glm::ivec2 Air::getTextureOffset(Direction dir, glm::ivec3 corner) {
-    return glm::ivec2(11, 1);
+glm::vec2 Air::getTextureOffset(Direction dir, glm::ivec3 corner) {
+	glm::vec2 fileOffset(11, 1);
+	glm::vec2 blockOffset = BlockType::purge(dir, corner);
+    return (fileOffset + blockOffset) * BlockType::textureSize;
 }
 
-glm::ivec2 Dirt::getTextureOffset(Direction dir, glm::ivec3 corner) {
+glm::vec2 Dirt::getTextureOffset(Direction dir, glm::ivec3 corner) {
 	glm::vec2 fileOffset(2, 0);
 	glm::vec2 blockOffset = BlockType::purge(dir, corner);
     return (fileOffset + blockOffset) * BlockType::textureSize;
 }
 
-glm::ivec2 Grass::getTextureOffset(Direction dir, glm::ivec3 corner) {
+glm::vec2 Grass::getTextureOffset(Direction dir, glm::ivec3 corner) {
 	glm::vec2 fileOffset;
 	glm::vec2 blockOffset = BlockType::purge(dir, corner);
     switch(dir) {
@@ -44,7 +46,7 @@ glm::ivec2 Grass::getTextureOffset(Direction dir, glm::ivec3 corner) {
     return (fileOffset + blockOffset) * BlockType::textureSize;
 }
 
-glm::ivec2 WoodLog::getTextureOffset(Direction dir, glm::ivec3 corner) {
+glm::vec2 WoodLog::getTextureOffset(Direction dir, glm::ivec3 corner) {
 	glm::vec2 fileOffset;
 	glm::vec2 blockOffset = BlockType::purge(dir, corner);
     switch(dir) {
@@ -59,37 +61,37 @@ glm::ivec2 WoodLog::getTextureOffset(Direction dir, glm::ivec3 corner) {
     return (fileOffset + blockOffset) * BlockType::textureSize;
 }
 
-glm::ivec2 WoodPlank::getTextureOffset(Direction dir, glm::ivec3 corner) {
+glm::vec2 WoodPlank::getTextureOffset(Direction dir, glm::ivec3 corner) {
 	glm::vec2 fileOffset(5, 0);
 	glm::vec2 blockOffset = BlockType::purge(dir, corner);
     return (fileOffset + blockOffset) * BlockType::textureSize;
 }
 
-glm::ivec2 Stone::getTextureOffset(Direction dir, glm::ivec3 corner) {
+glm::vec2 Stone::getTextureOffset(Direction dir, glm::ivec3 corner) {
 	glm::vec2 fileOffset(1, 0);
 	glm::vec2 blockOffset = BlockType::purge(dir, corner);
     return (fileOffset + blockOffset) * BlockType::textureSize;
 }
 
-glm::ivec2 Cobblestone::getTextureOffset(Direction dir, glm::ivec3 corner) {
+glm::vec2 Cobblestone::getTextureOffset(Direction dir, glm::ivec3 corner) {
 	glm::vec2 fileOffset(0, 1);
 	glm::vec2 blockOffset = BlockType::purge(dir, corner);
     return (fileOffset + blockOffset) * BlockType::textureSize;
 }
 
-glm::ivec2 Sand::getTextureOffset(Direction dir, glm::ivec3 corner) {
+glm::vec2 Sand::getTextureOffset(Direction dir, glm::ivec3 corner) {
 	glm::vec2 fileOffset(2, 1);
 	glm::vec2 blockOffset = BlockType::purge(dir, corner);
     return (fileOffset + blockOffset) * BlockType::textureSize;
 }
 
-glm::ivec2 Gravel::getTextureOffset(Direction dir, glm::ivec3 corner) {
+glm::vec2 Gravel::getTextureOffset(Direction dir, glm::ivec3 corner) {
 	glm::vec2 fileOffset(3, 1);
 	glm::vec2 blockOffset = BlockType::purge(dir, corner);
     return (fileOffset + blockOffset) * BlockType::textureSize;
 }
 
-glm::ivec2 Bedrock::getTextureOffset(Direction dir, glm::ivec3 corner) {
+glm::vec2 Bedrock::getTextureOffset(Direction dir, glm::ivec3 corner) {
 	glm::vec2 fileOffset(1, 1);
 	glm::vec2 blockOffset = BlockType::purge(dir, corner);
     return (fileOffset + blockOffset) * BlockType::textureSize;

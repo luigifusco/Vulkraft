@@ -6,8 +6,8 @@
 #include "utils/enums.hpp"
 
 const int CHUNK_HEIGHT = 16;
-const int CHUNK_WIDTH = 16;
-const int CHUNK_DEPTH = 16;
+const int CHUNK_WIDTH = 256;
+const int CHUNK_DEPTH = 256;
 
 struct BlockVertex {
     glm::vec3 pos;
@@ -33,16 +33,7 @@ struct Block {
 	};
 
     Block() {
-        switch(rand() % 4) {
-            case 0:
-                type = new Air();
-            case 1:
-                type = new Dirt();
-            case 2:
-                type = new Grass();
-            case 3:
-                type = new WoodLog();
-        }
+        type = new Air();
     }
 };
 
@@ -92,9 +83,36 @@ class Chunk {
 			}
 		}
 
+		int sampleHeight(int x, int z) {
+			static const int minHeight = 10;
+			static const float varY = 8.0;
+			static const float varX = 10.0;
+			static const float varZ = 10.0;
+
+			float globX = coordinates.x + x;
+			float globZ = coordinates.z + z;
+			float dY = varY * cos(globX / varX) * cos(globZ / varZ);
+
+			return std::min(minHeight + std::max((int)dY, 0), CHUNK_HEIGHT - 1);
+		}
+
+		void initTerrain() {
+            for (int x = 0; x < CHUNK_WIDTH; ++x) {
+				for (int z = 0; z < CHUNK_DEPTH; ++z) {
+					int maxY = sampleHeight(x, z);
+					blocks[x][0][z].type = new Bedrock();
+					for (int y = 1; y < maxY; ++y) {
+						blocks[x][y][z].type = new Dirt();
+                    }
+					blocks[x][maxY][z].type = new Grass();
+                }
+            }
+		}
+
     public:
         Chunk(int x, int y, int z) {
             coordinates = glm::ivec3(x, y, z);
+			initTerrain();
         }
 
 		std::vector<BlockVertex> getVertices() {
