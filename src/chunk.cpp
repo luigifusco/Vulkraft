@@ -4,10 +4,13 @@
 
 #include "blocks/block.hpp"
 #include "utils/enums.hpp"
+#include "utils/perlin_noise.hpp"
 
-const int CHUNK_HEIGHT = 16;
+const int CHUNK_HEIGHT = 127;
 const int CHUNK_WIDTH = 256;
 const int CHUNK_DEPTH = 256;
+
+const bool SHOW_CHUNK_BORDER = false;
 
 struct BlockVertex {
     glm::vec3 pos;
@@ -43,6 +46,8 @@ class Chunk {
         glm::ivec3 coordinates;
         std::vector<BlockVertex> vertices;
         std::vector<int> indices;
+        const siv::PerlinNoise::seed_type seed = 123456u;
+        const siv::PerlinNoise perlin{ seed };
 
 		std::vector<Direction> getVisibleFaces(int x, int y, int z) {
 			Block block = blocks[x][y][z];
@@ -84,16 +89,15 @@ class Chunk {
 		}
 
 		int sampleHeight(int x, int z) {
-			static const int minHeight = 10;
-			static const float varY = 8.0;
-			static const float varX = 10.0;
-			static const float varZ = 10.0;
+            static const int octaves = 20;
+			static const int minHeight = 16;
+			static const float varY = 20.0;
 
-			float globX = coordinates.x + x;
-			float globZ = coordinates.z + z;
-			float dY = varY * cos(globX / varX) * cos(globZ / varZ);
-
-			return std::min(minHeight + std::max((int)dY, 0), CHUNK_HEIGHT - 1);
+            float dx = (float)(x + coordinates.x) / CHUNK_WIDTH;
+            float dz = (float)(z + coordinates.z) / CHUNK_DEPTH;
+            
+            const float noise = varY * perlin.normalizedOctave2D(dx, dz, octaves);
+            return std::clamp(minHeight + (int)noise, 0, CHUNK_HEIGHT - 1);
 		}
 
 		void initTerrain() {
@@ -104,7 +108,11 @@ class Chunk {
 					for (int y = 1; y < maxY; ++y) {
 						blocks[x][y][z].type = new Dirt();
                     }
-					blocks[x][maxY][z].type = new Grass();
+                    if(SHOW_CHUNK_BORDER && (x == 0 || z == 0)) {
+                        blocks[x][maxY][z].type = new Dirt();
+                    } else {
+                        blocks[x][maxY][z].type = new Grass();
+                    }
                 }
             }
 		}
