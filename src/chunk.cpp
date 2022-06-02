@@ -7,10 +7,13 @@
 
 #include "blocks/block.hpp"
 #include "utils/enums.hpp"
+#include "utils/perlin_noise.hpp"
 
-const int CHUNK_HEIGHT = 4;
-const int CHUNK_WIDTH = 4;
-const int CHUNK_DEPTH = 4;
+const int CHUNK_HEIGHT = 127;
+const int CHUNK_WIDTH = 256;
+const int CHUNK_DEPTH = 256;
+
+const bool SHOW_CHUNK_BORDER = false;
 
 struct BlockVertex {
     glm::vec3 pos;
@@ -66,20 +69,7 @@ struct Block {
 	};
 
     Block() {
-        switch(rand() % 4) {
-            case 0:
-                type = new Air();
-                break;
-            case 1:
-                type = new Dirt();
-                break;
-            case 2:
-                type = new Grass();
-                break;
-            case 3:
-                type = new WoodLog();
-                break;
-        }
+        type = new Air();
     }
 };
 
@@ -89,6 +79,8 @@ class Chunk {
         glm::ivec3 coordinates;
         std::vector<BlockVertex> vertices;
         std::vector<uint32_t> indices;
+        const siv::PerlinNoise::seed_type seed = 123456u;
+        const siv::PerlinNoise perlin{ seed };
 
 		std::vector<Direction> getVisibleFaces(int x, int y, int z) {
 			Block block = blocks[x][y][z];
@@ -129,9 +121,39 @@ class Chunk {
 			}
 		}
 
+		int sampleHeight(int x, int z) {
+            static const int octaves = 20;
+			static const int minHeight = 16;
+			static const float varY = 20.0;
+
+            float dx = (float)(x + coordinates.x) / CHUNK_WIDTH;
+            float dz = (float)(z + coordinates.z) / CHUNK_DEPTH;
+            
+            const float noise = varY * perlin.normalizedOctave2D(dx, dz, octaves);
+            return std::clamp(minHeight + (int)noise, 0, CHUNK_HEIGHT - 1);
+		}
+
+		void initTerrain() {
+            for (int x = 0; x < CHUNK_WIDTH; ++x) {
+				for (int z = 0; z < CHUNK_DEPTH; ++z) {
+					int maxY = sampleHeight(x, z);
+					blocks[x][0][z].type = new Bedrock();
+					for (int y = 1; y < maxY; ++y) {
+						blocks[x][y][z].type = new Dirt();
+                    }
+                    if(SHOW_CHUNK_BORDER && (x == 0 || z == 0)) {
+                        blocks[x][maxY][z].type = new Dirt();
+                    } else {
+                        blocks[x][maxY][z].type = new Grass();
+                    }
+                }
+            }
+		}
+
     public:
         Chunk(int x, int y, int z) {
             coordinates = glm::ivec3(x, y, z);
+			initTerrain();
         }
 
 		std::vector<BlockVertex> getVertices() {
