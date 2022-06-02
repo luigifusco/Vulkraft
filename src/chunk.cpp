@@ -1,18 +1,51 @@
 #include <glm/glm.hpp>
 #include <vector>
 #include <map>
+#include <array>
+
+#include <vulkan/vulkan.h>
 
 #include "blocks/block.hpp"
 #include "utils/enums.hpp"
 
-const int CHUNK_HEIGHT = 16;
-const int CHUNK_WIDTH = 16;
-const int CHUNK_DEPTH = 16;
+const int CHUNK_HEIGHT = 4;
+const int CHUNK_WIDTH = 4;
+const int CHUNK_DEPTH = 4;
 
 struct BlockVertex {
     glm::vec3 pos;
 	glm::vec3 norm;
     glm::vec2 tex;
+
+    static VkVertexInputBindingDescription getBindingDescription() {
+        VkVertexInputBindingDescription bindingDescription{};
+        bindingDescription.binding = 0;
+        bindingDescription.stride = sizeof(BlockVertex);
+        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+        return bindingDescription;
+    }
+
+    static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions() {
+        std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
+
+        attributeDescriptions[0].binding = 0;
+        attributeDescriptions[0].location = 0;
+        attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[0].offset = offsetof(BlockVertex, pos);
+
+        attributeDescriptions[1].binding = 0;
+        attributeDescriptions[1].location = 1;
+        attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[1].offset = offsetof(BlockVertex, norm);
+
+        attributeDescriptions[2].binding = 0;
+        attributeDescriptions[2].location = 2;
+        attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+        attributeDescriptions[2].offset = offsetof(BlockVertex, tex);
+
+        return attributeDescriptions;
+    }
 };
 
 struct BlockFace {
@@ -36,12 +69,16 @@ struct Block {
         switch(rand() % 4) {
             case 0:
                 type = new Air();
+                break;
             case 1:
                 type = new Dirt();
+                break;
             case 2:
                 type = new Grass();
+                break;
             case 3:
                 type = new WoodLog();
+                break;
         }
     }
 };
@@ -51,7 +88,7 @@ class Chunk {
         Block blocks[CHUNK_WIDTH][CHUNK_HEIGHT][CHUNK_DEPTH];
         glm::ivec3 coordinates;
         std::vector<BlockVertex> vertices;
-        std::vector<int> indices;
+        std::vector<uint32_t> indices;
 
 		std::vector<Direction> getVisibleFaces(int x, int y, int z) {
 			Block block = blocks[x][y][z];
@@ -101,7 +138,7 @@ class Chunk {
 			return vertices;
 		}
 
-		std::vector<int> getIndices() {
+		std::vector<uint32_t> getIndices() {
 			return indices;
 		}
 

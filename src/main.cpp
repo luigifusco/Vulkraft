@@ -29,6 +29,8 @@
 #include <set>
 #include <unordered_map>
 
+#include "chunk.cpp"
+
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
 
@@ -81,7 +83,7 @@ struct SwapChainSupportDetails {
     std::vector<VkSurfaceFormatKHR> formats;
     std::vector<VkPresentModeKHR> presentModes;
 };
-
+/*
 struct Vertex {
     glm::vec3 pos;
     glm::vec3 color;
@@ -128,12 +130,13 @@ namespace std {
             return ((hash<glm::vec3>()(vertex.pos) ^ (hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^ (hash<glm::vec2>()(vertex.texCoord) << 1);
         }
     };
-}
+}*/
 
 struct UniformBufferObject {
     alignas(16) glm::mat4 model;
     alignas(16) glm::mat4 view;
     alignas(16) glm::mat4 proj;
+    alignas(16) glm::vec3 lightDir;
 };
 
 class HelloTriangleApplication {
@@ -187,7 +190,7 @@ private:
     VkImageView textureImageView;
     VkSampler textureSampler;
 
-    std::vector<Vertex> vertices;
+    std::vector<BlockVertex> vertices;
     std::vector<uint32_t> indices;
     VkBuffer vertexBuffer;
     VkDeviceMemory vertexBufferMemory;
@@ -246,7 +249,11 @@ private:
         createTextureImage();
         createTextureImageView();
         createTextureSampler();
-        loadModel();
+        //loadModel();
+        Chunk chunk(0, 0, 0);
+        chunk.build();
+        vertices = chunk.getVertices();
+        indices = chunk.getIndices();
         createVertexBuffer();
         createIndexBuffer();
         createUniformBuffers();
@@ -372,6 +379,7 @@ private:
         //ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
         ubo.view = CamMat;
         ubo.proj = Prj;
+        ubo.lightDir = glm::normalize(glm::vec3(1, 1, 2));
 
 		void* data;
 		vkMapMemory(device, uniformBuffersMemory[currentImage], 0,
@@ -735,14 +743,14 @@ private:
             throw std::runtime_error("failed to create render pass!");
         }
     }
-
+    
     void createDescriptorSetLayout() {
         VkDescriptorSetLayoutBinding uboLayoutBinding{};
         uboLayoutBinding.binding = 0;
         uboLayoutBinding.descriptorCount = 1;
         uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         uboLayoutBinding.pImmutableSamplers = nullptr;
-        uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
         VkDescriptorSetLayoutBinding samplerLayoutBinding{};
         samplerLayoutBinding.binding = 1;
@@ -786,8 +794,8 @@ private:
         VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
         vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 
-        auto bindingDescription = Vertex::getBindingDescription();
-        auto attributeDescriptions = Vertex::getAttributeDescriptions();
+        auto bindingDescription = BlockVertex::getBindingDescription();
+        auto attributeDescriptions = BlockVertex::getAttributeDescriptions();
 
         vertexInputInfo.vertexBindingDescriptionCount = 1;
         vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
@@ -1259,7 +1267,7 @@ private:
         endSingleTimeCommands(commandBuffer);
     }
 
-    void loadModel() {
+    /*void loadModel() {
         tinyobj::attrib_t attrib;
         std::vector<tinyobj::shape_t> shapes;
         std::vector<tinyobj::material_t> materials;
@@ -1296,7 +1304,7 @@ private:
                 indices.push_back(uniqueVertices[vertex]);
             }
         }
-    }
+    }*/
 
     void createVertexBuffer() {
         VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
@@ -1304,7 +1312,7 @@ private:
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingBufferMemory;
         createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-
+        std::cout << vertices.size() << std::endl;
         void* data;
         vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
             memcpy(data, vertices.data(), (size_t) bufferSize);
@@ -1844,6 +1852,8 @@ private:
 };
 
 int main() {
+    srand(time(NULL));
+
     HelloTriangleApplication app;
 
     try {
