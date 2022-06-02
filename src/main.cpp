@@ -29,13 +29,13 @@
 #include <set>
 #include <unordered_map>
 
-#include "chunk.cpp"
+#include "chunk.hpp"
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
 
 const std::string MODEL_PATH = "models/viking_room.obj";
-const std::string TEXTURE_PATH = "textures/viking_room.png";
+const std::string TEXTURE_PATH = "textures/blocks.png";
 
 const int MAX_FRAMES_IN_FLIGHT = 2;
 
@@ -301,7 +301,7 @@ private:
 
 
 		const float ROT_SPEED = glm::radians(60.0f);
-		const float MOVE_SPEED = 1.25f;
+        const float MOVE_SPEED = 5.0f;//1.25f;
 		const float MOUSE_RES = 500.0f;
 		
 		static double old_xpos = 0, old_ypos = 0;
