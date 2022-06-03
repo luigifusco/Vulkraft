@@ -31,6 +31,8 @@
 #include <cmath>
 
 #include "chunk.hpp"
+#include "player.hpp"
+#include "camera.hpp"
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
@@ -168,9 +170,12 @@ private:
     std::vector<VkFence> inFlightFences;
     uint32_t currentFrame = 0;
 
-    glm::mat3 CamDir = glm::mat3(1.0f);
-	glm::vec3 CamPos = glm::vec3(0.0f, 0.5f, 2.5f);
-	glm::vec3 CamAng = glm::vec3(0.0f, 0.0f, 0.0f);
+    // glm::mat3 CamDir = glm::mat3(1.0f);
+	// glm::vec3 CamPos = glm::vec3(0.0f, 50.5f, 2.5f);
+	// glm::vec3 CamAng = glm::vec3(0.0f, 0.0f, 0.0f);
+
+    Camera camera = Camera();
+    Player player = Player(camera);
 
     bool framebufferResized = false;
     bool cursorEnabled = true;
@@ -246,12 +251,15 @@ private:
 		static float lastTime = 0.0f;
 		
 		auto currentTime = std::chrono::high_resolution_clock::now();
-		float time = std::chrono::duration<float, std::chrono::seconds::period>
-					(currentTime - startTime).count();
+		float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 		float deltaT = time - lastTime;
 		lastTime = time;
 					
 		static float debounce = time;
+        
+        const float SUN_SPEED = glm::radians(0.1f);
+        static glm::vec3 sunDir(0, 1, 0);
+
 
         if(glfwGetKey(window, GLFW_KEY_ESCAPE)) {
             if(time - debounce > 0.33) {
@@ -260,93 +268,9 @@ private:
                 framebufferResized = true;
             }
         }
-
-		const float ROT_SPEED = glm::radians(60.0f);
-        const float MOVE_SPEED = 10.0f;
-		const float MOUSE_RES = 500.0f;
 		
-		static double old_xpos = 0, old_ypos = 0;
+        glm::ivec3 curChunkIndex((int) floor(player.getCamera().getPosition().x / (float)CHUNK_WIDTH) * CHUNK_WIDTH, 0, (int) floor(player.getCamera().getPosition().z / (float)CHUNK_DEPTH) * CHUNK_DEPTH);
 
-        static glm::vec3 sunDir(0, 1, 0);
-        const float SUN_SPEED = glm::radians(0.1f);
-
-		double xpos, ypos;
-		glfwGetCursorPos(window, &xpos, &ypos);
-		double m_dx = old_xpos - xpos;
-		double m_dy = old_ypos - ypos;
-		old_xpos = xpos; old_ypos = ypos;
-
-        if(!cursorEnabled) {
-			CamAng.y += m_dx * ROT_SPEED / MOUSE_RES;
-            CamAng.x += m_dy * ROT_SPEED / MOUSE_RES;
-			CamAng.x = std::clamp(CamAng.x, glm::radians(-90.0f), glm::radians(90.0f));
-        }
-
-		// glfwSetInputMode(window, GLFW_STICKY_MOUSE_BUTTONS, GLFW_TRUE);
-		// if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
-		// 	CamAng.y += m_dx * ROT_SPEED / MOUSE_RES;
-		// 	CamAng.x += m_dy * ROT_SPEED / MOUSE_RES;
-		// }
-
-		if(glfwGetKey(window, GLFW_KEY_LEFT)) {
-			CamAng.y += deltaT * ROT_SPEED;
-		}
-		if(glfwGetKey(window, GLFW_KEY_RIGHT)) {
-			CamAng.y -= deltaT * ROT_SPEED;
-		}
-		if(glfwGetKey(window, GLFW_KEY_UP)) {
-			CamAng.x += deltaT * ROT_SPEED;
-		}
-		if(glfwGetKey(window, GLFW_KEY_DOWN)) {
-			CamAng.x -= deltaT * ROT_SPEED;
-		}
-		// if(glfwGetKey(window, GLFW_KEY_Q)) {
-		// 	CamAng.z -= deltaT * ROT_SPEED;
-		// }
-		// if(glfwGetKey(window, GLFW_KEY_E)) {
-		// 	CamAng.z += deltaT * ROT_SPEED;
-		// }
-		
-		glm::mat3 CamDir = glm::mat3(glm::rotate(glm::mat4(1.0f), CamAng.y, glm::vec3(0.0f, 1.0f, 0.0f))) *
-						   glm::mat3(glm::rotate(glm::mat4(1.0f), CamAng.x, glm::vec3(1.0f, 0.0f, 0.0f))) *
-						   glm::mat3(glm::rotate(glm::mat4(1.0f), CamAng.z, glm::vec3(0.0f, 0.0f, 1.0f)));
-		
-		
-		if(glfwGetKey(window, GLFW_KEY_A)) {
-			CamPos -= MOVE_SPEED * glm::vec3(glm::rotate(glm::mat4(1.0f), CamAng.y,
-									glm::vec3(0.0f, 1.0f, 0.0f)) * glm::vec4(1,0,0,1)) * deltaT;
-		}
-		if(glfwGetKey(window, GLFW_KEY_D)) {
-			CamPos += MOVE_SPEED * glm::vec3(glm::rotate(glm::mat4(1.0f), CamAng.y,
-									glm::vec3(0.0f, 1.0f, 0.0f)) * glm::vec4(1,0,0,1)) * deltaT;
-		}
-		if(glfwGetKey(window, GLFW_KEY_S)) {
-			CamPos += MOVE_SPEED * glm::vec3(glm::rotate(glm::mat4(1.0f), CamAng.y,
-									glm::vec3(0.0f, 1.0f, 0.0f)) * glm::vec4(0,0,1,1)) * deltaT;
-		}
-		if(glfwGetKey(window, GLFW_KEY_W)) {
-			CamPos -= MOVE_SPEED * glm::vec3(glm::rotate(glm::mat4(1.0f), CamAng.y,
-									glm::vec3(0.0f, 1.0f, 0.0f)) * glm::vec4(0,0,1,1)) * deltaT;
-		}
-		if(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT)) {
-			CamPos -= MOVE_SPEED * glm::vec3(0,1,0) * deltaT;
-		}
-		if(glfwGetKey(window, GLFW_KEY_SPACE)) {
-			CamPos += MOVE_SPEED * glm::vec3(0,1,0) * deltaT;
-		}
-
-        if (glfwGetKey(window, GLFW_KEY_R)) {
-            vertices.clear();
-            indices.clear();
-            for (auto& chunk : chunkMap) {
-                delete chunk.second;
-            }
-            chunkMap.clear();
-        }
-
-
-
-        glm::ivec3 curChunkIndex((int) floor(CamPos.x / (float)CHUNK_WIDTH) * CHUNK_WIDTH, 0, (int) floor(CamPos.z / (float)CHUNK_DEPTH) * CHUNK_DEPTH);
         const auto& curChunk = chunkMap.find(curChunkIndex);
         if (curChunk == chunkMap.end()) {
             Chunk* newChunk = new Chunk(curChunkIndex);
@@ -360,10 +284,32 @@ private:
             createIndexBuffer();
         }
 
+        //movement
 
+        if(!cursorEnabled) {
+            player.onCursorPositionEvent(window);
+        }
+
+
+        player.onKeyEvent(window , deltaT);
+
+        //---
+
+        if (glfwGetKey(window, GLFW_KEY_R)) {
+            vertices.clear();
+            indices.clear();
+            for (auto& chunk : chunkMap) {
+                delete chunk.second;
+            }
+            chunkMap.clear();
+        }
+
+
+        
+        
         sunDir = (glm::rotate(glm::mat4(1.0f), SUN_SPEED, glm::vec3(1, 0, 0)) * glm::vec4(sunDir, 1.0f));
 
-		glm::mat4 CamMat = glm::translate(glm::transpose(glm::mat4(CamDir)), -CamPos);
+		
 					
 		glm::mat4 Prj = glm::perspective(glm::radians(80.0f),
 						swapChainExtent.width / (float) swapChainExtent.height,
@@ -373,7 +319,7 @@ private:
 		// updates global uniforms
 		VertexUniformBufferObject vubo{};
         vubo.model = glm::mat4(1.0f);
-        vubo.view = CamMat;
+        vubo.view = player.getCamera().getMatrix();
         vubo.proj = Prj;
 
         FragmentUniformBufferObject fubo{};
