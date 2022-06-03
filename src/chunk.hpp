@@ -3,9 +3,9 @@
 #include "blocks/block.hpp"
 #include "utils/perlin_noise.hpp"
 
-const int CHUNK_HEIGHT = 8;
-const int CHUNK_WIDTH = 8;
-const int CHUNK_DEPTH = 8;
+const int CHUNK_HEIGHT = 32;
+const int CHUNK_WIDTH = 32;
+const int CHUNK_DEPTH = 32;
 const bool SHOW_CHUNK_BORDER = false;
 
 

@@ -333,7 +333,8 @@ private:
 
         if(!cursorEnabled) {
 			CamAng.y += m_dx * ROT_SPEED / MOUSE_RES;
-			CamAng.x += m_dy * ROT_SPEED / MOUSE_RES;
+            CamAng.x += m_dy * ROT_SPEED / MOUSE_RES;
+			CamAng.x = std::clamp(CamAng.x, glm::radians(-90.0f), glm::radians(90.0f));
         }
 
 		// glfwSetInputMode(window, GLFW_STICKY_MOUSE_BUTTONS, GLFW_TRUE);
