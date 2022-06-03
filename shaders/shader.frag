@@ -1,12 +1,9 @@
 #version 450
 
-layout(binding = 0) uniform UniformBufferObject {
-    mat4 model;
-    mat4 view;
-    mat4 proj;
+layout(binding = 1) uniform FragmentUniformBufferObject {
     vec3 lightDir;
 } ubo;
-layout(binding = 1) uniform sampler2D texSampler;
+layout(binding = 2) uniform sampler2D texSampler;
 
 layout(location = 0) in vec3 fragNorm;
 layout(location = 1) in vec2 fragTexCoord;

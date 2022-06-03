@@ -85,10 +85,13 @@ struct SwapChainSupportDetails {
     std::vector<VkPresentModeKHR> presentModes;
 };
 
-struct UniformBufferObject {
+struct VertexUniformBufferObject {
     alignas(16) glm::mat4 model;
     alignas(16) glm::mat4 view;
     alignas(16) glm::mat4 proj;
+};
+
+struct FragmentUniformBufferObject {
     alignas(16) glm::vec3 lightDir;
 };
 
@@ -150,8 +153,10 @@ private:
     VkBuffer indexBuffer;
     VkDeviceMemory indexBufferMemory;
 
-    std::vector<VkBuffer> uniformBuffers;
-    std::vector<VkDeviceMemory> uniformBuffersMemory;
+    std::vector<VkBuffer> vertexUniformBuffers;
+    std::vector<VkDeviceMemory> vertexUniformBuffersMemory;
+    std::vector<VkBuffer> fragmentUniformBuffers;
+    std::vector<VkDeviceMemory> fragmentUniformBuffersMemory;
 
     VkDescriptorPool descriptorPool;
     std::vector<VkDescriptorSet> descriptorSets;
@@ -261,6 +266,10 @@ private:
 		const float MOUSE_RES = 500.0f;
 		
 		static double old_xpos = 0, old_ypos = 0;
+
+        static glm::vec3 sunDir(0, 1, 0);
+        const float SUN_SPEED = glm::radians(0.1f);
+
 		double xpos, ypos;
 		glfwGetCursorPos(window, &xpos, &ypos);
 		double m_dx = old_xpos - xpos;
@@ -352,7 +361,7 @@ private:
         }
 
 
-
+        sunDir = (glm::rotate(glm::mat4(1.0f), SUN_SPEED, glm::vec3(1, 0, 0)) * glm::vec4(sunDir, 1.0f));
 
 		glm::mat4 CamMat = glm::translate(glm::transpose(glm::mat4(CamDir)), -CamPos);
 					
@@ -362,17 +371,25 @@ private:
 		Prj[1][1] *= -1;
 	
 		// updates global uniforms
-		UniformBufferObject ubo{};
-        ubo.model = glm::mat4(1.0f);
-        ubo.view = CamMat;
-        ubo.proj = Prj;
-        ubo.lightDir = glm::normalize(glm::vec3(1, 1, 2));
+		VertexUniformBufferObject vubo{};
+        vubo.model = glm::mat4(1.0f);
+        vubo.view = CamMat;
+        vubo.proj = Prj;
+
+        FragmentUniformBufferObject fubo{};
+        fubo.lightDir = sunDir;
+
 
 		void* data;
-		vkMapMemory(device, uniformBuffersMemory[currentImage], 0,
-							sizeof(ubo), 0, &data);
-		memcpy(data, &ubo, sizeof(ubo));
-		vkUnmapMemory(device, uniformBuffersMemory[currentImage]);
+		vkMapMemory(device, vertexUniformBuffersMemory[currentImage], 0,
+							sizeof(vubo), 0, &data);
+		memcpy(data, &vubo, sizeof(vubo));
+		vkUnmapMemory(device, vertexUniformBuffersMemory[currentImage]);
+
+        vkMapMemory(device, fragmentUniformBuffersMemory[currentImage], 0,
+            sizeof(fubo), 0, &data);
+        memcpy(data, &fubo, sizeof(fubo));
+        vkUnmapMemory(device, fragmentUniformBuffersMemory[currentImage]);
 	}
 
     void drawChunk(Chunk* newChunk) {
@@ -422,8 +439,10 @@ private:
         cleanupSwapChain();
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            vkDestroyBuffer(device, uniformBuffers[i], nullptr);
-            vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
+            vkDestroyBuffer(device, vertexUniformBuffers[i], nullptr);
+            vkFreeMemory(device, vertexUniformBuffersMemory[i], nullptr);
+            vkDestroyBuffer(device, fragmentUniformBuffers[i], nullptr);
+            vkFreeMemory(device, fragmentUniformBuffersMemory[i], nullptr);
         }
 
         vkDestroyDescriptorPool(device, descriptorPool, nullptr);
@@ -751,21 +770,29 @@ private:
     }
     
     void createDescriptorSetLayout() {
-        VkDescriptorSetLayoutBinding uboLayoutBinding{};
-        uboLayoutBinding.binding = 0;
-        uboLayoutBinding.descriptorCount = 1;
-        uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        uboLayoutBinding.pImmutableSamplers = nullptr;
-        uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+        VkDescriptorSetLayoutBinding vertexUboLayoutBinding{};
+        vertexUboLayoutBinding.binding = 0;
+        vertexUboLayoutBinding.descriptorCount = 1;
+        vertexUboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        vertexUboLayoutBinding.pImmutableSamplers = nullptr;
+        vertexUboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+        VkDescriptorSetLayoutBinding fragmentUboLayoutBinding{};
+        fragmentUboLayoutBinding.binding = 1;
+        fragmentUboLayoutBinding.descriptorCount = 1;
+        fragmentUboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        fragmentUboLayoutBinding.pImmutableSamplers = nullptr;
+        fragmentUboLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
         VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-        samplerLayoutBinding.binding = 1;
+        samplerLayoutBinding.binding = 2;
         samplerLayoutBinding.descriptorCount = 1;
         samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         samplerLayoutBinding.pImmutableSamplers = nullptr;
         samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-        std::array<VkDescriptorSetLayoutBinding, 2> bindings = {uboLayoutBinding, samplerLayoutBinding};
+
+        std::array<VkDescriptorSetLayoutBinding, 3> bindings = {vertexUboLayoutBinding, fragmentUboLayoutBinding, samplerLayoutBinding};
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
         layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
@@ -1352,22 +1379,28 @@ private:
     }
 
     void createUniformBuffers() {
-        VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+        VkDeviceSize vertexBufferSize = sizeof(VertexUniformBufferObject);
+        VkDeviceSize fragmentBufferSize = sizeof(FragmentUniformBufferObject);
 
-        uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-        uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+        vertexUniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+        vertexUniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+        fragmentUniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+        fragmentUniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
+            createBuffer(vertexBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, vertexUniformBuffers[i], vertexUniformBuffersMemory[i]);
+            createBuffer(fragmentBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, fragmentUniformBuffers[i], fragmentUniformBuffersMemory[i]);
         }
     }
 
     void createDescriptorPool() {
-        std::array<VkDescriptorPoolSize, 2> poolSizes{};
+        std::array<VkDescriptorPoolSize, 3> poolSizes{};
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-        poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        poolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+        poolSizes[2].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        poolSizes[2].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
 
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -1394,17 +1427,22 @@ private:
         }
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            VkDescriptorBufferInfo bufferInfo{};
-            bufferInfo.buffer = uniformBuffers[i];
-            bufferInfo.offset = 0;
-            bufferInfo.range = sizeof(UniformBufferObject);
+            VkDescriptorBufferInfo vertexBufferInfo{};
+            vertexBufferInfo.buffer = vertexUniformBuffers[i];
+            vertexBufferInfo.offset = 0;
+            vertexBufferInfo.range = sizeof(VertexUniformBufferObject);
+
+            VkDescriptorBufferInfo fragmentBufferInfo{};
+            fragmentBufferInfo.buffer = fragmentUniformBuffers[i];
+            fragmentBufferInfo.offset = 0;
+            fragmentBufferInfo.range = sizeof(VertexUniformBufferObject);
 
             VkDescriptorImageInfo imageInfo{};
             imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             imageInfo.imageView = textureImageView;
             imageInfo.sampler = textureSampler;
 
-            std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+            std::array<VkWriteDescriptorSet, 3> descriptorWrites{};
 
             descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             descriptorWrites[0].dstSet = descriptorSets[i];
@@ -1412,15 +1450,23 @@ private:
             descriptorWrites[0].dstArrayElement = 0;
             descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
             descriptorWrites[0].descriptorCount = 1;
-            descriptorWrites[0].pBufferInfo = &bufferInfo;
+            descriptorWrites[0].pBufferInfo = &vertexBufferInfo;
 
             descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             descriptorWrites[1].dstSet = descriptorSets[i];
             descriptorWrites[1].dstBinding = 1;
             descriptorWrites[1].dstArrayElement = 0;
-            descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
             descriptorWrites[1].descriptorCount = 1;
-            descriptorWrites[1].pImageInfo = &imageInfo;
+            descriptorWrites[1].pBufferInfo = &fragmentBufferInfo;
+
+            descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[2].dstSet = descriptorSets[i];
+            descriptorWrites[2].dstBinding = 2;
+            descriptorWrites[2].dstArrayElement = 0;
+            descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            descriptorWrites[2].descriptorCount = 1;
+            descriptorWrites[2].pImageInfo = &imageInfo;
 
             vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
         }

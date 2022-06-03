@@ -1,10 +1,9 @@
 #version 450
 
-layout(binding = 0) uniform UniformBufferObject {
+layout(binding = 0) uniform VertexUniformBufferObject {
     mat4 model;
     mat4 view;
     mat4 proj;
-    vec3 lightDir;
 } ubo;
 
 layout(location = 0) in vec3 inPosition;
