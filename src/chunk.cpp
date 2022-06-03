@@ -2,6 +2,7 @@
 #include <vector>
 #include <map>
 #include <array>
+#include <unordered_map>
 
 #include <vulkan/vulkan.h>
 
@@ -56,6 +57,7 @@ std::array<VkVertexInputAttributeDescription, 3> BlockVertex::getAttributeDescri
 
         return attributeDescriptions;
     }
+
 
 std::vector<Direction> Chunk::getVisibleFaces(int x, int y, int z) {
     Block block = blocks[x][y][z];
@@ -126,16 +128,17 @@ void Chunk::initTerrain() {
 }
 
 
-Chunk::Chunk(int x, int y, int z) {
-    coordinates = glm::ivec3(x, y, z);
+Chunk::Chunk(glm::ivec3 pos) : coordinates(pos) {
     initTerrain();
 }
 
-std::vector<BlockVertex> Chunk::getVertices() {
+Chunk::Chunk(int x, int y, int z) : Chunk(glm::ivec3(x, y, z)) {}
+
+std::vector<BlockVertex>& Chunk::getVertices() {
     return vertices;
 }
 
-std::vector<uint32_t> Chunk::getIndices() {
+std::vector<uint32_t>& Chunk::getIndices() {
     return indices;
 }
 

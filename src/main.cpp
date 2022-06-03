@@ -28,6 +28,7 @@
 #include <optional>
 #include <set>
 #include <unordered_map>
+#include <cmath>
 
 #include "chunk.hpp"
 
@@ -169,6 +170,8 @@ private:
     bool framebufferResized = false;
     bool cursorEnabled = true;
 
+    std::unordered_map<glm::ivec3, Chunk*> chunkMap = { std::pair(glm::ivec3(0, 0, 0), new Chunk(0, 0, 0)) };
+
     void initWindow() {
         glfwInit();
 
@@ -202,11 +205,7 @@ private:
         createTextureImage();
         createTextureImageView();
         createTextureSampler();
-        //loadModel();
-        Chunk chunk(-CHUNK_WIDTH, -CHUNK_HEIGHT - 2, -CHUNK_DEPTH);
-        chunk.build();
-        vertices = chunk.getVertices();
-        indices = chunk.getIndices();
+        drawAllChunks();
         createVertexBuffer();
         createIndexBuffer();
         createUniformBuffers();
@@ -248,21 +247,6 @@ private:
 		lastTime = time;
 					
 		static float debounce = time;
-		
-		// if(glfwGetKey(window, GLFW_KEY_SPACE)) {
-		// 	if(time - debounce > 0.33) {
-		// //		curText = (curText + 1) % SceneText.size();
-		// 		debounce = time;
-		// 		framebufferResized = true;
-		// 	}
-		// }			
-		// if(glfwGetKey(window, GLFW_KEY_X)) {
-		// 	if(time - debounce > 0.33) {
-		// //		xray = !xray;
-		// 		debounce = time;
-		// 		framebufferResized = true;
-		// 	}
-		// }
 
         if(glfwGetKey(window, GLFW_KEY_ESCAPE)) {
             if(time - debounce > 0.33) {
@@ -341,7 +325,34 @@ private:
 		if(glfwGetKey(window, GLFW_KEY_SPACE)) {
 			CamPos += MOVE_SPEED * glm::vec3(0,1,0) * deltaT;
 		}
-// std::cout << "Cam Pos: " << CamPos[0] << " " << CamPos[1] << " " << CamPos[2] << "\n";
+
+        if (glfwGetKey(window, GLFW_KEY_R)) {
+            vertices.clear();
+            indices.clear();
+            for (auto& chunk : chunkMap) {
+                delete chunk.second;
+            }
+            chunkMap.clear();
+        }
+
+
+
+        glm::ivec3 curChunkIndex((int) floor(CamPos.x / (float)CHUNK_WIDTH) * CHUNK_WIDTH, 0, (int) floor(CamPos.z / (float)CHUNK_DEPTH) * CHUNK_DEPTH);
+        const auto& curChunk = chunkMap.find(curChunkIndex);
+        if (curChunk == chunkMap.end()) {
+            Chunk* newChunk = new Chunk(curChunkIndex);
+            newChunk->build();
+
+            drawChunk(newChunk);
+
+            chunkMap.insert(std::pair(curChunkIndex, newChunk));
+
+            createVertexBuffer();
+            createIndexBuffer();
+        }
+
+
+
 
 		glm::mat4 CamMat = glm::translate(glm::transpose(glm::mat4(CamDir)), -CamPos);
 					
@@ -353,7 +364,6 @@ private:
 		// updates global uniforms
 		UniformBufferObject ubo{};
         ubo.model = glm::mat4(1.0f);
-        //ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
         ubo.view = CamMat;
         ubo.proj = Prj;
         ubo.lightDir = glm::normalize(glm::vec3(1, 1, 2));
@@ -364,6 +374,25 @@ private:
 		memcpy(data, &ubo, sizeof(ubo));
 		vkUnmapMemory(device, uniformBuffersMemory[currentImage]);
 	}
+
+    void drawChunk(Chunk* newChunk) {
+        std::vector<BlockVertex>& curVertices = newChunk->getVertices();
+        std::vector<uint32_t>& curIndices = newChunk->getIndices();
+
+        for (uint32_t& i : curIndices) {
+            i += vertices.size();
+        }
+
+        vertices.insert(vertices.end(), curVertices.begin(), curVertices.end());
+        indices.insert(indices.end(), curIndices.begin(), curIndices.end());
+    }
+
+    void drawAllChunks() {
+        for (auto& iter : chunkMap) {
+            iter.second->build();
+            drawChunk(iter.second);
+        }
+    }
 
     void cleanupSwapChain() {
         vkDestroyImageView(device, depthImageView, nullptr);
@@ -1289,7 +1318,6 @@ private:
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingBufferMemory;
         createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-        std::cout << vertices.size() << std::endl;
         void* data;
         vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
             memcpy(data, vertices.data(), (size_t) bufferSize);

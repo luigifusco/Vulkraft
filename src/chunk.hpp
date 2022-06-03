@@ -3,6 +3,9 @@
 #include "blocks/block.hpp"
 #include "utils/perlin_noise.hpp"
 
+#include <unordered_map>
+#include <glm/glm.hpp>
+
 const int CHUNK_HEIGHT = 32;
 const int CHUNK_WIDTH = 32;
 const int CHUNK_DEPTH = 32;
@@ -60,9 +63,11 @@ class Chunk {
     public:
         Chunk(int x, int y, int z);
 
-		std::vector<BlockVertex> getVertices();
+		Chunk(glm::ivec3 pos);
 
-		std::vector<uint32_t> getIndices();
+		std::vector<BlockVertex>& getVertices();
+
+		std::vector<uint32_t>& getIndices();
 
         void build();
 };
