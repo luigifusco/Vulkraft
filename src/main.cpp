@@ -1435,7 +1435,7 @@ private:
             VkDescriptorBufferInfo fragmentBufferInfo{};
             fragmentBufferInfo.buffer = fragmentUniformBuffers[i];
             fragmentBufferInfo.offset = 0;
-            fragmentBufferInfo.range = sizeof(VertexUniformBufferObject);
+            fragmentBufferInfo.range = sizeof(FragmentUniformBufferObject);
 
             VkDescriptorImageInfo imageInfo{};
             imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
