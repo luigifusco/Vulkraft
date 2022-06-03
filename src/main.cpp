@@ -356,9 +356,9 @@ private:
 
 		glm::mat4 CamMat = glm::translate(glm::transpose(glm::mat4(CamDir)), -CamPos);
 					
-		glm::mat4 Prj = glm::perspective(glm::radians(45.0f),
+		glm::mat4 Prj = glm::perspective(glm::radians(80.0f),
 						swapChainExtent.width / (float) swapChainExtent.height,
-						0.1f, 50.0f);
+						0.1f, 128.0f);
 		Prj[1][1] *= -1;
 	
 		// updates global uniforms
