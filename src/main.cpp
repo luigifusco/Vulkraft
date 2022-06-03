@@ -215,6 +215,7 @@ private:
 	glm::vec3 CamAng = glm::vec3(0.0f, 0.0f, 0.0f);
 
     bool framebufferResized = false;
+    bool cursorEnabled = true;
 
     void initWindow() {
         glfwInit();
@@ -250,7 +251,7 @@ private:
         createTextureImageView();
         createTextureSampler();
         //loadModel();
-        Chunk chunk(0, 0, 0);
+        Chunk chunk(-CHUNK_WIDTH, -CHUNK_HEIGHT - 2, -CHUNK_DEPTH);
         chunk.build();
         vertices = chunk.getVertices();
         indices = chunk.getIndices();
@@ -263,7 +264,19 @@ private:
         createSyncObjects();
     }
 
+    void toggleCursor() {
+        if(cursorEnabled) {
+            cursorEnabled = false;
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        } else {
+            cursorEnabled = true;
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        }
+    }
+
     void mainLoop() {
+        toggleCursor();
+
         while (!glfwWindowShouldClose(window)) {
             glfwPollEvents();
             drawFrame();
@@ -284,39 +297,50 @@ private:
 					
 		static float debounce = time;
 		
-		if(glfwGetKey(window, GLFW_KEY_SPACE)) {
-			if(time - debounce > 0.33) {
-		//		curText = (curText + 1) % SceneText.size();
-				debounce = time;
-				framebufferResized = true;
-			}
-		}			
-		if(glfwGetKey(window, GLFW_KEY_X)) {
-			if(time - debounce > 0.33) {
-		//		xray = !xray;
-				debounce = time;
-				framebufferResized = true;
-			}
-		}
+		// if(glfwGetKey(window, GLFW_KEY_SPACE)) {
+		// 	if(time - debounce > 0.33) {
+		// //		curText = (curText + 1) % SceneText.size();
+		// 		debounce = time;
+		// 		framebufferResized = true;
+		// 	}
+		// }			
+		// if(glfwGetKey(window, GLFW_KEY_X)) {
+		// 	if(time - debounce > 0.33) {
+		// //		xray = !xray;
+		// 		debounce = time;
+		// 		framebufferResized = true;
+		// 	}
+		// }
 
+        if(glfwGetKey(window, GLFW_KEY_ESCAPE)) {
+            if(time - debounce > 0.33) {
+                toggleCursor();
+                debounce = time;
+                framebufferResized = true;
+            }
+        }
 
 		const float ROT_SPEED = glm::radians(60.0f);
-        const float MOVE_SPEED = 5.0f;//1.25f;
+        const float MOVE_SPEED = 10.0f;
 		const float MOUSE_RES = 500.0f;
 		
 		static double old_xpos = 0, old_ypos = 0;
 		double xpos, ypos;
 		glfwGetCursorPos(window, &xpos, &ypos);
-		double m_dx = xpos - old_xpos;
-		double m_dy = ypos - old_ypos;
+		double m_dx = old_xpos - xpos;
+		double m_dy = old_ypos - ypos;
 		old_xpos = xpos; old_ypos = ypos;
-//std::cout << xpos << " " << ypos << " " << m_dx << " " << m_dy << "\n";
 
-		glfwSetInputMode(window, GLFW_STICKY_MOUSE_BUTTONS, GLFW_TRUE);
-		if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+        if(!cursorEnabled) {
 			CamAng.y += m_dx * ROT_SPEED / MOUSE_RES;
 			CamAng.x += m_dy * ROT_SPEED / MOUSE_RES;
-		}
+        }
+
+		// glfwSetInputMode(window, GLFW_STICKY_MOUSE_BUTTONS, GLFW_TRUE);
+		// if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+		// 	CamAng.y += m_dx * ROT_SPEED / MOUSE_RES;
+		// 	CamAng.x += m_dy * ROT_SPEED / MOUSE_RES;
+		// }
 
 		if(glfwGetKey(window, GLFW_KEY_LEFT)) {
 			CamAng.y += deltaT * ROT_SPEED;
@@ -330,12 +354,12 @@ private:
 		if(glfwGetKey(window, GLFW_KEY_DOWN)) {
 			CamAng.x -= deltaT * ROT_SPEED;
 		}
-		if(glfwGetKey(window, GLFW_KEY_Q)) {
-			CamAng.z -= deltaT * ROT_SPEED;
-		}
-		if(glfwGetKey(window, GLFW_KEY_E)) {
-			CamAng.z += deltaT * ROT_SPEED;
-		}
+		// if(glfwGetKey(window, GLFW_KEY_Q)) {
+		// 	CamAng.z -= deltaT * ROT_SPEED;
+		// }
+		// if(glfwGetKey(window, GLFW_KEY_E)) {
+		// 	CamAng.z += deltaT * ROT_SPEED;
+		// }
 		
 		glm::mat3 CamDir = glm::mat3(glm::rotate(glm::mat4(1.0f), CamAng.y, glm::vec3(0.0f, 1.0f, 0.0f))) *
 						   glm::mat3(glm::rotate(glm::mat4(1.0f), CamAng.x, glm::vec3(1.0f, 0.0f, 0.0f))) *
@@ -358,10 +382,10 @@ private:
 			CamPos -= MOVE_SPEED * glm::vec3(glm::rotate(glm::mat4(1.0f), CamAng.y,
 									glm::vec3(0.0f, 1.0f, 0.0f)) * glm::vec4(0,0,1,1)) * deltaT;
 		}
-		if(glfwGetKey(window, GLFW_KEY_F)) {
+		if(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT)) {
 			CamPos -= MOVE_SPEED * glm::vec3(0,1,0) * deltaT;
 		}
-		if(glfwGetKey(window, GLFW_KEY_R)) {
+		if(glfwGetKey(window, GLFW_KEY_SPACE)) {
 			CamPos += MOVE_SPEED * glm::vec3(0,1,0) * deltaT;
 		}
 // std::cout << "Cam Pos: " << CamPos[0] << " " << CamPos[1] << " " << CamPos[2] << "\n";
