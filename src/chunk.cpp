@@ -10,6 +10,23 @@
 #include "utils/perlin_noise.hpp"
 #include "chunk.hpp"
 
+
+/* singleton block definition */
+const Air* AIR = new Air();
+const Dirt* DIRT = new Dirt();
+const Grass* GRASS = new Grass();
+const WoodLog* WOOD_LOG = new WoodLog();
+const WoodPlank* WOOD_PLANK = new WoodPlank();
+const Stone* STONE = new Stone();
+const Cobblestone* COBBLESTONE = new Cobblestone();
+const Sand* SAND = new Sand();
+const Bedrock* BEDROCK = new Bedrock();
+/* -------------------------  */
+
+Block::Block() {
+    type = (BlockType*) AIR;
+}
+
 VkVertexInputBindingDescription BlockVertex::getBindingDescription()  {
     VkVertexInputBindingDescription bindingDescription{};
     bindingDescription.binding = 0;
@@ -95,14 +112,14 @@ void Chunk::initTerrain() {
     for (int x = 0; x < CHUNK_WIDTH; ++x) {
         for (int z = 0; z < CHUNK_DEPTH; ++z) {
             int maxY = sampleHeight(x, z);
-            blocks[x][0][z].type = new Bedrock();
+            blocks[x][0][z].type = (BlockType*) BEDROCK;
             for (int y = 1; y < maxY; ++y) {
-                blocks[x][y][z].type = new Dirt();
+                blocks[x][y][z].type = (BlockType*) DIRT;
             }
             if(SHOW_CHUNK_BORDER && (x == 0 || z == 0)) {
-                blocks[x][maxY][z].type = new Dirt();
+                blocks[x][maxY][z].type = (BlockType*) DIRT;
             } else {
-                blocks[x][maxY][z].type = new Grass();
+                blocks[x][maxY][z].type = (BlockType*) GRASS;
             }
         }
     }
