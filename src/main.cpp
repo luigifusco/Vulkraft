@@ -177,7 +177,7 @@ private:
     bool framebufferResized = false;
     bool cursorEnabled = true;
 
-    std::unordered_map<glm::ivec3, Chunk*> chunkMap = { std::pair(glm::ivec3(0, 0, 0), new Chunk(0, 0, 0)) };
+    std::unordered_map<glm::ivec3, Chunk*> chunkMap = { std::pair(glm::ivec3(0, 0, 0), new Chunk(0, 0, 0, chunkMap)) };
 
     void initWindow() {
         glfwInit();
@@ -362,13 +362,13 @@ private:
             auto iter = chunkIndexesToAdd.begin();
             glm::ivec3 curChunkIndex = *iter;
             chunkIndexesToAdd.erase(iter);
-            Chunk* newChunk = new Chunk(curChunkIndex);
+            Chunk* newChunk = new Chunk(curChunkIndex, chunkMap);
+            chunkMap.insert(std::pair(curChunkIndex, newChunk));
 
             newChunk->build();
             drawChunk(newChunk);
             newChunk->clear();
 
-            chunkMap.insert(std::pair(curChunkIndex, newChunk));
 
             createVertexBuffer();
             createIndexBuffer();
