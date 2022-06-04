@@ -28,6 +28,7 @@
 #include <optional>
 #include <set>
 #include <unordered_map>
+#include <unordered_set>
 #include <cmath>
 
 #include "chunk.hpp"
@@ -344,11 +345,22 @@ private:
             chunkMap.clear();
         }
 
-
-
-        glm::ivec3 curChunkIndex((int) floor(CamPos.x / (float)CHUNK_WIDTH) * CHUNK_WIDTH, 0, (int) floor(CamPos.z / (float)CHUNK_DEPTH) * CHUNK_DEPTH);
-        const auto& curChunk = chunkMap.find(curChunkIndex);
-        if (curChunk == chunkMap.end()) {
+        static std::unordered_set<glm::ivec3> chunkIndexesToAdd;
+        glm::ivec3 baseChunkIndex((int) floor(CamPos.x / (float)CHUNK_WIDTH) * CHUNK_WIDTH, 0, (int) floor(CamPos.z / (float)CHUNK_DEPTH) * CHUNK_DEPTH);
+        for (int i = -2; i <= 2; ++i) {
+            for (int j = -2; j <= 2; ++j) {
+                glm::ivec3 curChunkIndex(baseChunkIndex.x + i * CHUNK_WIDTH, baseChunkIndex.y, baseChunkIndex.z + j * CHUNK_DEPTH);
+                if (chunkMap.find(curChunkIndex) == chunkMap.end()) {
+                    if (chunkIndexesToAdd.find(curChunkIndex) == chunkIndexesToAdd.end()) {
+                        chunkIndexesToAdd.insert(curChunkIndex);
+                    }
+                }
+            }
+        }
+        if (chunkIndexesToAdd.size()) {
+            auto iter = chunkIndexesToAdd.begin();
+            glm::ivec3 curChunkIndex = *iter;
+            chunkIndexesToAdd.erase(iter);
             Chunk* newChunk = new Chunk(curChunkIndex);
             newChunk->build();
 
@@ -359,7 +371,6 @@ private:
             createVertexBuffer();
             createIndexBuffer();
         }
-
 
         sunDir = (glm::rotate(glm::mat4(1.0f), SUN_SPEED, glm::vec3(1, 0, 0)) * glm::vec4(sunDir, 1.0f));
 
