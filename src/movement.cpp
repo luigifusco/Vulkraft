@@ -2,15 +2,39 @@
 #include <iostream>
 
 
+#include "AABB.hpp"
+
+
 bool Movement::canMove(const glm::vec3 & position ,const glm::vec3 & direction, const std::unordered_map<glm::ivec3, Chunk*> &chunkMap){
 
-    glm::ivec3 currChunkIndex = Chunk::findChunkIndex(position, chunkMap);
-    // glm::ivec3 nextChunkIndex = Chunk::findChunkIndex(position + direction , chunkMap);
+    PlayerAABB playerBox;
+    
+    glm::vec3 endPosition = position + direction;
 
+    glm::vec3 chunkIndex = Chunk::findChunkIndex(endPosition , chunkMap);
 
-//    const auto& chunk = chunkMap.find(currChunkIndex);
+    const auto & chunkIterator = chunkMap.find(chunkIndex);
+    if(chunkIterator  == chunkMap.end()) return true;
 
-//    if(chunk->)
+    const auto & chunk = chunkIterator->second;
+    const auto & positions = chunk->getBlockPositions();
+
+    for(auto & point: playerBox.points){
+        point += endPosition;
+    }
+
+    for(const auto & position : positions){
+
+        BlockAABB block(position);
+
+        if(playerBox.intersect(block)){
+            return false;
+        }
+
+    }
+
+    // std::cout << "Chunk Index : " << chunkIndex.x << "," << chunkIndex.y << "," << chunkIndex.z << std::endl;
+
 
 
 

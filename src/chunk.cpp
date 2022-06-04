@@ -154,6 +154,24 @@ void Chunk::build() {
     }
 }
 
+std::vector<glm::ivec3> Chunk::getBlockPositions(){
+    std::vector<glm::ivec3> positions;
+
+    for (int x = 0 ; x < CHUNK_WIDTH ; x++){
+        for(int y = 0 ; y< CHUNK_HEIGHT ; y++){
+            for(int z = 0; z < CHUNK_WIDTH ; z++){
+                if(blocks[x][y][z].type->isVisible()){
+                    positions.push_back(coordinates + glm::ivec3(x,y,z));
+                }
+            }
+        }
+    }
+
+    return positions;
+
+}
+
+
 glm::ivec3 Chunk::findChunkIndex(glm::vec3 position, const std::unordered_map<glm::ivec3, Chunk*> & chunkMap ) {
         return glm::vec3((int) floor(position.x / (float)CHUNK_WIDTH) * CHUNK_WIDTH, 0, (int) floor(position.z / (float)CHUNK_DEPTH) * CHUNK_DEPTH);
 }

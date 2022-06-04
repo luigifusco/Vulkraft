@@ -74,5 +74,7 @@ class Chunk {
 
         void build();
 
+		std::vector<glm::ivec3> getBlockPositions();
+
 		static glm::ivec3 findChunkIndex(glm::vec3 position, const std::unordered_map<glm::ivec3, Chunk*> & chunkMap );
 };
