@@ -94,6 +94,7 @@ struct VertexUniformBufferObject {
 
 struct FragmentUniformBufferObject {
     alignas(16) glm::vec3 lightDir;
+    alignas(16) glm::vec3 eyePos;
 };
 
 class HelloTriangleApplication {
@@ -269,7 +270,7 @@ private:
 		static double old_xpos = 0, old_ypos = 0;
 
         static glm::vec3 sunDir(0, 1, 0);
-        const float SUN_SPEED = glm::radians(0.1f);
+        const float SUN_SPEED = glm::radians(0.3f);
 
 		double xpos, ypos;
 		glfwGetCursorPos(window, &xpos, &ypos);
@@ -362,9 +363,10 @@ private:
             glm::ivec3 curChunkIndex = *iter;
             chunkIndexesToAdd.erase(iter);
             Chunk* newChunk = new Chunk(curChunkIndex);
-            newChunk->build();
 
+            newChunk->build();
             drawChunk(newChunk);
+            newChunk->clear();
 
             chunkMap.insert(std::pair(curChunkIndex, newChunk));
 
@@ -389,6 +391,8 @@ private:
 
         FragmentUniformBufferObject fubo{};
         fubo.lightDir = sunDir;
+        fubo.eyePos = CamPos;
+        //fubo.lightDir = glm::normalize(glm::vec3(1, 1, 2));
 
 
 		void* data;
@@ -419,6 +423,7 @@ private:
         for (auto& iter : chunkMap) {
             iter.second->build();
             drawChunk(iter.second);
+            iter.second->clear();
         }
     }
 

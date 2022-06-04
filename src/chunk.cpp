@@ -153,3 +153,8 @@ void Chunk::build() {
         }
     }
 }
+
+void Chunk::clear() {
+    vertices.clear();
+    indices.clear();
+}

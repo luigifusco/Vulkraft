@@ -70,4 +70,6 @@ class Chunk {
 		std::vector<uint32_t>& getIndices();
 
         void build();
+
+		void clear();
 };
