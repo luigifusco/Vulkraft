@@ -4,7 +4,10 @@
 #include "utils/perlin_noise.hpp"
 
 #include <unordered_map>
+#include <map>
 #include <glm/glm.hpp>
+
+#include <vulkan/vulkan.h>
 
 const int CHUNK_HEIGHT = 32;
 const int CHUNK_WIDTH = 32;
@@ -70,4 +73,6 @@ class Chunk {
 		std::vector<uint32_t>& getIndices();
 
         void build();
+
+		static glm::ivec3 findChunkIndex(glm::vec3 position, const std::unordered_map<glm::ivec3, Chunk*> & chunkMap );
 };

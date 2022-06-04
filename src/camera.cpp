@@ -4,7 +4,7 @@
 Camera::Camera(){
     CamMat = getMatrix();
     CamDir = glm::mat3(1.0f);
-    CamPos = glm::vec3(0.0f);
+    CamPos = glm::vec3(0.0f , 50.0f , 0.0f);
     CamAng = glm::vec3(0.0f);
 }
 
@@ -15,8 +15,8 @@ void Camera::updateDirection(){
                 glm::mat3(glm::rotate(glm::mat4(1.0f), CamAng.z, glm::vec3(0.0f, 0.0f, 1.0f)));
 }
 
-void Camera::updatePosition(glm::vec4 direction, float speed, float deltaT){
-    CamPos += speed * glm::vec3(glm::rotate(glm::mat4(1.0f), CamAng.y, glm::vec3(0.0f, 1.0f, 0.0f)) * direction) * deltaT;
+void Camera::updatePosition(glm::vec3 direction){
+    CamPos += glm::vec3(glm::rotate(glm::mat4(1.0f), CamAng.y, glm::vec3(0.0f, 1.0f, 0.0f)) * glm::vec4(direction.x, direction.y, direction.z, 1));
 }
 
 glm::vec3 Camera::getPosition(){

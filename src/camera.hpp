@@ -3,16 +3,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-namespace CameraDirection {
-    const glm::vec4 Right = glm::vec4(1,0,0,1);
-    const glm::vec4 Left = glm::vec4(-1,0,0,1);
-    const glm::vec4 Backward = glm::vec4(0,0,1,1);
-    const glm::vec4 Forward = glm::vec4(0,0,-1,1);
-    const glm::vec4 Up = glm::vec4(0,1,0,1);
-    const glm::vec4 Down = glm::vec4(0,-1,0,1);
- 
 
-}
 
 class Camera {
     private:
@@ -36,7 +27,7 @@ class Camera {
         glm::mat4 getCamera();
         glm::vec3 getPosition();
         void setPOsition(glm::vec3 position);
-        void updatePosition(glm::vec4 direction , float speed, float deltaT);
+        void updatePosition(glm::vec3 direction);
         glm::mat3 getDirection();
         glm::vec3 getAngle();
         void updateAngle(double x , double y);

@@ -1,37 +1,81 @@
 #include "player.hpp"
 
+#include "movement.hpp"
 
+#include <iostream>
 
 Player::Player(Camera &_camera) : camera(_camera){}
 
 Player::~Player(){}
 
 
-void Player::onKeyEvent(GLFWwindow* window , float deltaT){
+void Player::update(float deltaT, const std::unordered_map<glm::ivec3, Chunk*> &chunkMap ){
     
+    if(movements.empty()) return;
+    
+    glm::vec3 movement(0);
+    
+
+
+    for(const auto & mov : movements){
+        movement += mov;
+
+    }
+
+    if(movement == glm::vec3(0)) return;
+
+    movement = glm::normalize(movement) * speed * deltaT;
+
+
+
+    glm::vec3 newPosition(0);
+
+    if(collision){
+        std::vector<glm::vec3> axes = {glm::vec3(1,0,0),glm::vec3(0,1,0),glm::vec3(0,0,1)};
+
+        for(const auto & axis : axes){
+            glm::vec3 movementInAxis = movement * axis;
+            if(Movement::canMove(camera.getPosition(), movementInAxis, chunkMap)){
+                newPosition += movementInAxis;
+            }
+        }
+
+    }
+
+
+
+    camera.updatePosition(newPosition);
+
+}
+
+
+
+void Player::onKeyEvent(GLFWwindow* window , float deltaT , const std::unordered_map<glm::ivec3, Chunk*> &chunkMap ){
+    movements.clear();
     if(glfwGetKey(window, GLFW_KEY_A)) {
-        camera.updatePosition(CameraDirection::Left, speed, deltaT);
+        movements.insert(MovementDirection::Left);
     }
     if(glfwGetKey(window, GLFW_KEY_D)) {
-        camera.updatePosition(CameraDirection::Right, speed, deltaT);
+        movements.insert(MovementDirection::Right);
     
     }        
     if(glfwGetKey(window, GLFW_KEY_S)) {
-        camera.updatePosition(CameraDirection::Backward, speed, deltaT);
+        movements.insert(MovementDirection::Backward);
         
     }
     if(glfwGetKey(window, GLFW_KEY_W)) {
-        camera.updatePosition(CameraDirection::Forward, speed, deltaT);
+        movements.insert(MovementDirection::Forward);
         
     }
     if(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT)) {
-        camera.updatePosition(CameraDirection::Down, speed, deltaT);
-
+        movements.insert(MovementDirection::Down);
     }
     if(glfwGetKey(window, GLFW_KEY_SPACE)) {
-        camera.updatePosition(CameraDirection::Up, speed, deltaT);
+        movements.insert(MovementDirection::Up);
 
     }
+
+    update(deltaT , chunkMap);
 
 
 }

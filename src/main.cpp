@@ -269,7 +269,7 @@ private:
             }
         }
 		
-        glm::ivec3 curChunkIndex((int) floor(player.getCamera().getPosition().x / (float)CHUNK_WIDTH) * CHUNK_WIDTH, 0, (int) floor(player.getCamera().getPosition().z / (float)CHUNK_DEPTH) * CHUNK_DEPTH);
+        glm::ivec3 curChunkIndex(Chunk::findChunkIndex(player.getCamera().getPosition(), chunkMap));
 
         const auto& curChunk = chunkMap.find(curChunkIndex);
         if (curChunk == chunkMap.end()) {
@@ -291,7 +291,7 @@ private:
         }
 
 
-        player.onKeyEvent(window , deltaT);
+        player.onKeyEvent(window , deltaT , chunkMap);
 
         //---
 
