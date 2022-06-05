@@ -62,7 +62,7 @@ void Player::update(float deltaT, const std::unordered_map<glm::ivec3, Chunk*> &
 
 
 
-void Player::onKeyEvent(GLFWwindow* window , float deltaT , const std::unordered_map<glm::ivec3, Chunk*> &chunkMap ){
+void Player::keyEventListener(GLFWwindow* window , float deltaT , const std::unordered_map<glm::ivec3, Chunk*> &chunkMap ){
     movements.clear();
     if(glfwGetKey(window, GLFW_KEY_A)) {
         movements.insert(MovementDirection::Left);
@@ -96,7 +96,7 @@ void Player::onKeyEvent(GLFWwindow* window , float deltaT , const std::unordered
 
 }
 
-void Player::onCursorPositionEvent(GLFWwindow* window){
+void Player::cursorPositionEventListener(GLFWwindow* window){
     static double old_xpos = 0, old_ypos = 0;
 
     double xpos, ypos;

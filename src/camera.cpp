@@ -8,19 +8,24 @@ Camera::Camera(){
     CamAng = glm::vec3(0.0f);
 }
 
+Camera::~Camera(){
 
-void Camera::updateDirection(){
-    CamDir =    glm::mat3(glm::rotate(glm::mat4(1.0f), CamAng.y, glm::vec3(0.0f, 1.0f, 0.0f))) *
-                glm::mat3(glm::rotate(glm::mat4(1.0f), CamAng.x, glm::vec3(1.0f, 0.0f, 0.0f))) *
-                glm::mat3(glm::rotate(glm::mat4(1.0f), CamAng.z, glm::vec3(0.0f, 0.0f, 1.0f)));
+}
+
+glm::vec3 Camera::getPosition(){
+    return CamPos;
+}
+
+void Camera::setPosition(glm::vec3 position){
+    CamPos = position;
 }
 
 void Camera::updatePosition(glm::vec3 direction){
     CamPos += glm::vec3(glm::rotate(glm::mat4(1.0f), CamAng.y, glm::vec3(0.0f, 1.0f, 0.0f)) * glm::vec4(direction.x, direction.y, direction.z, 1));
 }
 
-glm::vec3 Camera::getPosition(){
-    return CamPos;
+glm::vec3 Camera::getAngle(){
+    return CamAng;
 }
 
 void Camera::updateAngle(double x , double y){
@@ -33,14 +38,14 @@ void Camera::updateAngle(double x , double y){
     updateDirection();
 }
 
-
-
-
 glm::mat4 Camera::getMatrix(){
     CamMat = glm::translate(glm::transpose(glm::mat4(CamDir)), -CamPos) ;
     return CamMat;
 }
 
-Camera::~Camera(){
 
+void Camera::updateDirection(){
+    CamDir =    glm::mat3(glm::rotate(glm::mat4(1.0f), CamAng.y, glm::vec3(0.0f, 1.0f, 0.0f))) *
+                glm::mat3(glm::rotate(glm::mat4(1.0f), CamAng.x, glm::vec3(1.0f, 0.0f, 0.0f))) *
+                glm::mat3(glm::rotate(glm::mat4(1.0f), CamAng.z, glm::vec3(0.0f, 0.0f, 1.0f)));
 }

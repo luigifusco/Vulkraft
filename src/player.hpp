@@ -1,4 +1,5 @@
 #pragma once
+
 #include<GLFW/glfw3.h>
 #include <glm/gtx/hash.hpp>
 
@@ -30,8 +31,8 @@ class Player{
         Camera getCamera();
 
 
-        void onKeyEvent(GLFWwindow* window , float deltaT , const std::unordered_map<glm::ivec3, Chunk*> &chunkMap);
-        void onCursorPositionEvent(GLFWwindow* window);
+        void keyEventListener(GLFWwindow* window , float deltaT , const std::unordered_map<glm::ivec3, Chunk*> &chunkMap);
+        void cursorPositionEventListener(GLFWwindow* window);
 
 
 };

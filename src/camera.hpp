@@ -24,12 +24,10 @@ class Camera {
         ~Camera();
 
 
-        glm::mat4 getCamera();
         glm::vec3 getPosition();
-        void setPOsition(glm::vec3 position);
+        void setPosition(glm::vec3 position);
         void updatePosition(glm::vec3 direction);
-        glm::mat3 getDirection();
-        glm::vec3 getAngle(){return CamAng;};
+        glm::vec3 getAngle();
         void updateAngle(double x , double y);
         glm::mat4 getMatrix();
 

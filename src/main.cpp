@@ -287,11 +287,11 @@ private:
         //movement
 
         if(!cursorEnabled) {
-            player.onCursorPositionEvent(window);
+            player.cursorPositionEventListener(window);
+            player.keyEventListener(window , deltaT , chunkMap);
         }
 
 
-        player.onKeyEvent(window , deltaT , chunkMap);
 
         //---
 
@@ -315,7 +315,8 @@ private:
 						swapChainExtent.width / (float) swapChainExtent.height,
 						0.1f, 128.0f);
 		Prj[1][1] *= -1;
-	
+
+
 		// updates global uniforms
 		VertexUniformBufferObject vubo{};
         vubo.model = glm::mat4(1.0f);
