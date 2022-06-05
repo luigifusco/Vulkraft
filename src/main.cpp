@@ -178,10 +178,6 @@ private:
     std::vector<VkFence> inFlightFences;
     uint32_t currentFrame = 0;
 
-    // glm::mat3 CamDir = glm::mat3(1.0f);
-	// glm::vec3 CamPos = glm::vec3(0.0f, 50.5f, 2.5f);
-	// glm::vec3 CamAng = glm::vec3(0.0f, 0.0f, 0.0f);
-
     Camera camera = Camera();
     Player player = Player(camera);
 
@@ -293,10 +289,6 @@ private:
 		lastTime = time;
 					
 		static float debounce = time;
-        
-        const float SUN_SPEED = glm::radians(0.1f);
-        static glm::vec3 sunDir(0, 1, 0);
-
 
         if(glfwGetKey(window, GLFW_KEY_ESCAPE)) {
             if(time - debounce > 0.33) {
@@ -305,30 +297,19 @@ private:
                 framebufferResized = true;
             }
         }
-		
-        glm::ivec3 curChunkIndex(Chunk::findChunkIndex(player.getCamera().getPosition(), chunkMap));
 
         static glm::vec3 sunDir(0, 1, 0);
         const float SUN_SPEED = glm::radians(0.3f);
 
-            drawChunk(newChunk);
 
-            chunkMap.insert(std::pair(curChunkIndex, newChunk));
-
-            createVertexBuffer();
-            createIndexBuffer();
-        }
-
-        //movement
 
         if(!cursorEnabled) {
-            player.cursorPositionEventListener(window);
-            player.keyEventListener(window , deltaT , chunkMap);
+			player.cursorPositionEventListener(window);
+            player.keyEventListener(window , deltaT, chunkMap);
         }
 
-
-
-        //---
+		
+		
 
         if (glfwGetKey(window, GLFW_KEY_R)) {
             vertices.clear();
@@ -340,7 +321,7 @@ private:
         }
 
         static std::unordered_set<glm::ivec3> chunkIndexesToAdd;
-        glm::ivec3 baseChunkIndex((int) floor(CamPos.x / (float)CHUNK_WIDTH) * CHUNK_WIDTH, 0, (int) floor(CamPos.z / (float)CHUNK_DEPTH) * CHUNK_DEPTH);
+        glm::ivec3 baseChunkIndex = Chunk::findChunkIndex(player.getCamera().getPosition(), chunkMap);
         for (int i = -2; i <= 2; ++i) {
             for (int j = -2; j <= 2; ++j) {
                 glm::ivec3 curChunkIndex(baseChunkIndex.x + i * CHUNK_WIDTH, baseChunkIndex.y, baseChunkIndex.z + j * CHUNK_DEPTH);
@@ -381,14 +362,12 @@ private:
 
         sunDir = (glm::rotate(glm::mat4(1.0f), SUN_SPEED, glm::vec3(1, 0, 0)) * glm::vec4(sunDir, 1.0f));
 
-		
 					
 		glm::mat4 Prj = glm::perspective(glm::radians(80.0f),
 						swapChainExtent.width / (float) swapChainExtent.height,
 						0.1f, 128.0f);
 		Prj[1][1] *= -1;
-
-
+	
 		// updates global uniforms
 		VertexUniformBufferObject vubo{};
         vubo.model = glm::mat4(1.0f);
@@ -397,7 +376,7 @@ private:
 
         FragmentUniformBufferObject fubo{};
         fubo.lightDir = sunDir;
-        fubo.eyePos = CamPos;
+        fubo.eyePos = player.getCamera().getPosition();
         //fubo.lightDir = glm::normalize(glm::vec3(1, 1, 2));
 
 
@@ -1327,35 +1306,27 @@ private:
         std::vector<tinyobj::shape_t> shapes;
         std::vector<tinyobj::material_t> materials;
         std::string warn, err;
-
         if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, MODEL_PATH.c_str())) {
             throw std::runtime_error(warn + err);
         }
-
         std::unordered_map<Vertex, uint32_t> uniqueVertices{};
-
         for (const auto& shape : shapes) {
             for (const auto& index : shape.mesh.indices) {
                 Vertex vertex{};
-
                 vertex.pos = {
                     attrib.vertices[3 * index.vertex_index + 0],
                     attrib.vertices[3 * index.vertex_index + 1],
                     attrib.vertices[3 * index.vertex_index + 2]
                 };
-
                 vertex.texCoord = {
                     attrib.texcoords[2 * index.texcoord_index + 0],
                     1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
                 };
-
                 vertex.color = {1.0f, 1.0f, 1.0f};
-
                 if (uniqueVertices.count(vertex) == 0) {
                     uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
                     vertices.push_back(vertex);
                 }
-
                 indices.push_back(uniqueVertices[vertex]);
             }
         }
