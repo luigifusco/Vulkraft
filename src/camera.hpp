@@ -29,8 +29,9 @@ class Camera {
         void setPOsition(glm::vec3 position);
         void updatePosition(glm::vec3 direction);
         glm::mat3 getDirection();
-        glm::vec3 getAngle();
+        glm::vec3 getAngle(){return CamAng;};
         void updateAngle(double x , double y);
         glm::mat4 getMatrix();
+
 
 };

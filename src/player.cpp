@@ -10,33 +10,45 @@ Player::~Player(){}
 
 
 void Player::update(float deltaT, const std::unordered_map<glm::ivec3, Chunk*> &chunkMap ){
-    
-    if(movements.empty()) return;
-    
+    glm::vec3 currentPosition = camera.getPosition();
+    glm::vec3 currentAngle = camera.getAngle();
     glm::vec3 movement(0);
+    glm::vec3 newDirection(0);
     
+    
+    if(movements.empty() && (gravity == false)) return;
+    
+    if(gravity){
+        gravityVector += glm::vec3(0,-1,0) * gravityFactor * deltaT;
 
+        if(Movement::canMove(currentPosition, gravityVector, chunkMap)){
+            newDirection += gravityVector;
+        }
+        else{
+            gravityVector = glm::vec3(0);
+            canJump = true;
+        }
+    }
 
     for(const auto & mov : movements){
         movement += mov;
-
     }
 
-    if(movement == glm::vec3(0)) return;
 
-    movement = glm::normalize(movement) * speed * deltaT;
+    if(movement != glm::vec3(0)){
+        movement = glm::normalize(movement) * speed * deltaT;
+    }
 
-
-
-    glm::vec3 newPosition(0);
 
     if(collision){
         std::vector<glm::vec3> axes = {glm::vec3(1,0,0),glm::vec3(0,1,0),glm::vec3(0,0,1)};
 
         for(const auto & axis : axes){
             glm::vec3 movementInAxis = movement * axis;
-            if(Movement::canMove(camera.getPosition(), movementInAxis, chunkMap)){
-                newPosition += movementInAxis;
+            //correct direction relative to cam angle
+            glm::vec3 direction = glm::vec3(glm::rotate(glm::mat4(1.0f), currentAngle.y, glm::vec3(0.0f, 1.0f, 0.0f)) * glm::vec4(movementInAxis.x, movementInAxis.y, movementInAxis.z, 1));
+            if(Movement::canMove(camera.getPosition(), direction, chunkMap)){
+                newDirection += movementInAxis;
             }
         }
 
@@ -44,7 +56,7 @@ void Player::update(float deltaT, const std::unordered_map<glm::ivec3, Chunk*> &
 
 
 
-    camera.updatePosition(newPosition);
+    camera.updatePosition(newDirection);
 
 }
 
@@ -71,8 +83,12 @@ void Player::onKeyEvent(GLFWwindow* window , float deltaT , const std::unordered
         movements.insert(MovementDirection::Down);
     }
     if(glfwGetKey(window, GLFW_KEY_SPACE)) {
-        movements.insert(MovementDirection::Up);
-
+        if(canJump && gravity){
+            gravityVector = MovementDirection::Up * jumpFactor * gravityFactor/4.5f;
+            canJump = false;
+        }else{
+            movements.insert(MovementDirection::Up);
+        }
     }
 
     update(deltaT , chunkMap);

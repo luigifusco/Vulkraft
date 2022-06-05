@@ -27,13 +27,12 @@ bool Movement::canMove(const glm::vec3 & position ,const glm::vec3 & direction, 
 
         BlockAABB block(position);
 
-        if(playerBox.intersect(block)){
+        if(block.intersect(playerBox)){
             return false;
         }
 
     }
 
-    // std::cout << "Chunk Index : " << chunkIndex.x << "," << chunkIndex.y << "," << chunkIndex.z << std::endl;
 
 
 
