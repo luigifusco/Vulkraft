@@ -5,6 +5,14 @@
 #include <unordered_map>
 
 #include <vulkan/vulkan.h>
+#include <glm/gtx/hash.hpp>
+
+#include <iostream>
+#include <queue>
+#include <mutex>
+#include <condition_variable>
+#include <atomic>
+
 
 #include "blocks/block.hpp"
 #include "utils/enums.hpp"
@@ -63,12 +71,34 @@ std::vector<Direction> Chunk::getVisibleFaces(int x, int y, int z) {
     Block block = blocks[x][y][z];
     if(!block.type->isVisible()) return {};
     std::vector<Direction> faces;
-    if(x == 0 || !blocks[x - 1][y][z].type->isOpaque) faces.push_back(Direction::West);
+    if (x == 0) {
+        glm::ivec3 wIndex(coordinates.x - CHUNK_WIDTH, coordinates.y, coordinates.z);
+        auto iter = chunkMap.find(wIndex);
+        if (iter == chunkMap.end() || !iter->second->blocks[CHUNK_WIDTH - 1][y][z].type->isOpaque) faces.push_back(Direction::West);
+    } else if (!blocks[x - 1][y][z].type->isOpaque) faces.push_back(Direction::West);
+
     if(y == 0 || !blocks[x][y - 1][z].type->isOpaque) faces.push_back(Direction::Down);
-    if(z == 0 || !blocks[x][y][z - 1].type->isOpaque) faces.push_back(Direction::South);
-    if(x == CHUNK_WIDTH - 1 || !blocks[x + 1][y][z].type->isOpaque) faces.push_back(Direction::East);
+
+    if (z == 0) {
+        glm::ivec3 sIndex(coordinates.x, coordinates.y, coordinates.z - CHUNK_DEPTH);
+        auto iter = chunkMap.find(sIndex);
+        if (iter == chunkMap.end() || !iter->second->blocks[x][y][CHUNK_DEPTH - 1].type->isOpaque) faces.push_back(Direction::South);
+    } else if (!blocks[x][y][z - 1].type->isOpaque) faces.push_back(Direction::South);
+
+    if (x == CHUNK_WIDTH - 1) {
+        glm::ivec3 eIndex(coordinates.x + CHUNK_WIDTH, coordinates.y, coordinates.z);
+        auto iter = chunkMap.find(eIndex);
+        if (iter == chunkMap.end() || !iter->second->blocks[0][y][z].type->isOpaque) faces.push_back(Direction::East);
+    } else if (!blocks[x + 1][y][z].type->isOpaque) faces.push_back(Direction::East);
+
     if(y == CHUNK_HEIGHT - 1 || !blocks[x][y + 1][z].type->isOpaque) faces.push_back(Direction::Up);
-    if(z == CHUNK_DEPTH - 1 || !blocks[x][y][z + 1].type->isOpaque) faces.push_back(Direction::North);
+
+    if (z == CHUNK_DEPTH - 1) {
+        glm::ivec3 nIndex(coordinates.x, coordinates.y, coordinates.z + CHUNK_DEPTH);
+        auto iter = chunkMap.find(nIndex);
+        if (iter == chunkMap.end() || !iter->second->blocks[x][y][0].type->isOpaque) faces.push_back(Direction::North);
+    } else if (!blocks[x][y][z + 1].type->isOpaque) faces.push_back(Direction::North);
+
     return faces;
 }
 
@@ -128,11 +158,11 @@ void Chunk::initTerrain() {
 }
 
 
-Chunk::Chunk(glm::ivec3 pos) : coordinates(pos) {
+Chunk::Chunk(glm::ivec3 pos, const std::unordered_map<glm::ivec3, Chunk*>& m) : coordinates(pos), chunkMap(m) {
     initTerrain();
 }
 
-Chunk::Chunk(int x, int y, int z) : Chunk(glm::ivec3(x, y, z)) {}
+Chunk::Chunk(int x, int y, int z, const std::unordered_map<glm::ivec3, Chunk*>& m) : Chunk(glm::ivec3(x, y, z), m) {}
 
 std::vector<BlockVertex>& Chunk::getVertices() {
     return vertices;
@@ -150,6 +180,38 @@ void Chunk::build() {
             for (int z = 0; z < CHUNK_DEPTH; ++z) {
                 buildBlock(x, y, z);
             }
+        }
+    }
+}
+
+void Chunk::clear() {
+    vertices.clear();
+    indices.clear();
+}
+
+void chunkGeneratorFunction(
+    std::unordered_map<glm::ivec3, Chunk*>& chunkMap,
+    std::queue<glm::ivec3>& inQ,
+    std::mutex& inM,
+    std::condition_variable& inC,
+    std::queue <std::pair<glm::ivec3, Chunk*>>& outQ,
+    std::mutex& outM,
+    std::atomic_bool& isThreadStopped) {
+    while (!isThreadStopped) {
+        glm::ivec3 curPos;
+        {
+            std::unique_lock l(inM);
+            while (inQ.empty())
+                inC.wait(l);
+            curPos = inQ.front();
+            inQ.pop();
+        }
+        Chunk* newChunk = new Chunk(curPos, chunkMap);
+        newChunk->build();
+        chunkMap.insert(std::pair(curPos, newChunk));
+        {
+            std::unique_lock l(outM);
+            outQ.push(std::pair(curPos, newChunk));
         }
     }
 }

@@ -28,7 +28,14 @@
 #include <optional>
 #include <set>
 #include <unordered_map>
+#include <unordered_set>
 #include <cmath>
+#include <thread>
+#include <queue>
+#include <mutex>
+#include <condition_variable>
+#include <functional>
+#include <atomic>
 
 #include "chunk.hpp"
 #include "player.hpp"
@@ -95,6 +102,7 @@ struct VertexUniformBufferObject {
 
 struct FragmentUniformBufferObject {
     alignas(16) glm::vec3 lightDir;
+    alignas(16) glm::vec3 eyePos;
 };
 
 class HelloTriangleApplication {
@@ -180,7 +188,17 @@ private:
     bool framebufferResized = false;
     bool cursorEnabled = true;
 
-    std::unordered_map<glm::ivec3, Chunk*> chunkMap = { std::pair(glm::ivec3(0, 0, 0), new Chunk(0, 0, 0)) };
+
+    std::unordered_map<glm::ivec3, Chunk*> chunkMap = { std::pair(glm::ivec3(0, 0, 0), new Chunk(0, 0, 0, chunkMap)) };
+
+    std::mutex inM, outM;
+    std::queue<glm::ivec3> inQ;
+    std::queue<std::pair<glm::ivec3, Chunk*>> outQ;
+    std::condition_variable inC;
+    std::atomic_bool isThreadStopped = false;
+
+    std::thread chunkThread;
+
 
     void initWindow() {
         glfwInit();
@@ -236,12 +254,31 @@ private:
     }
 
     void mainLoop() {
+
+        chunkThread = std::thread(
+            chunkGeneratorFunction,
+            std::ref(chunkMap),
+            std::ref(inQ),
+            std::ref(inM),
+            std::ref(inC),
+            std::ref(outQ),
+            std::ref(outM),
+            std::ref(isThreadStopped));
+
         toggleCursor();
 
         while (!glfwWindowShouldClose(window)) {
             glfwPollEvents();
             drawFrame();
         }
+
+        isThreadStopped = true;
+        {
+            std::unique_lock l(inM);
+            inQ.push(glm::ivec3(0));
+            inC.notify_all();
+        }
+        chunkThread.join();
 
         vkDeviceWaitIdle(device);
     }
@@ -271,10 +308,8 @@ private:
 		
         glm::ivec3 curChunkIndex(Chunk::findChunkIndex(player.getCamera().getPosition(), chunkMap));
 
-        const auto& curChunk = chunkMap.find(curChunkIndex);
-        if (curChunk == chunkMap.end()) {
-            Chunk* newChunk = new Chunk(curChunkIndex);
-            newChunk->build();
+        static glm::vec3 sunDir(0, 1, 0);
+        const float SUN_SPEED = glm::radians(0.3f);
 
             drawChunk(newChunk);
 
@@ -304,9 +339,46 @@ private:
             chunkMap.clear();
         }
 
+        static std::unordered_set<glm::ivec3> chunkIndexesToAdd;
+        glm::ivec3 baseChunkIndex((int) floor(CamPos.x / (float)CHUNK_WIDTH) * CHUNK_WIDTH, 0, (int) floor(CamPos.z / (float)CHUNK_DEPTH) * CHUNK_DEPTH);
+        for (int i = -2; i <= 2; ++i) {
+            for (int j = -2; j <= 2; ++j) {
+                glm::ivec3 curChunkIndex(baseChunkIndex.x + i * CHUNK_WIDTH, baseChunkIndex.y, baseChunkIndex.z + j * CHUNK_DEPTH);
+                if (chunkMap.find(curChunkIndex) == chunkMap.end()) {
+                    if (chunkIndexesToAdd.find(curChunkIndex) == chunkIndexesToAdd.end()) {
+                        chunkIndexesToAdd.insert(curChunkIndex);
+                        {
+                            std::unique_lock l(inM);
+                            inQ.push(curChunkIndex);
+                            inC.notify_all();
+                        }
+                    }
+                }
+            }
+        }
+        bool newChunksDrawn = false;
+        if (chunkIndexesToAdd.size()) {
+            std::vector<std::pair<glm::ivec3, Chunk*>> newChunks;
+            {
+                std::unique_lock l(outM);
+                while (!outQ.empty()) {
+                    newChunks.push_back(outQ.front());
+                    outQ.pop();
+                }
+            }
+            newChunksDrawn = !newChunks.empty();
+            for (auto& iter : newChunks) {
+                drawChunk(iter.second);
+                iter.second->clear();
+                chunkIndexesToAdd.erase(chunkIndexesToAdd.find(iter.first));
+            }
 
-        
-        
+            if (newChunksDrawn) {
+                createVertexBuffer();
+                createIndexBuffer();
+            }
+        }
+
         sunDir = (glm::rotate(glm::mat4(1.0f), SUN_SPEED, glm::vec3(1, 0, 0)) * glm::vec4(sunDir, 1.0f));
 
 		
@@ -325,6 +397,8 @@ private:
 
         FragmentUniformBufferObject fubo{};
         fubo.lightDir = sunDir;
+        fubo.eyePos = CamPos;
+        //fubo.lightDir = glm::normalize(glm::vec3(1, 1, 2));
 
 
 		void* data;
@@ -355,6 +429,7 @@ private:
         for (auto& iter : chunkMap) {
             iter.second->build();
             drawChunk(iter.second);
+            iter.second->clear();
         }
     }
 
@@ -1382,7 +1457,7 @@ private:
             VkDescriptorBufferInfo fragmentBufferInfo{};
             fragmentBufferInfo.buffer = fragmentUniformBuffers[i];
             fragmentBufferInfo.offset = 0;
-            fragmentBufferInfo.range = sizeof(VertexUniformBufferObject);
+            fragmentBufferInfo.range = sizeof(FragmentUniformBufferObject);
 
             VkDescriptorImageInfo imageInfo{};
             imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;

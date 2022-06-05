@@ -3,9 +3,11 @@
 #include "blocks/block.hpp"
 #include "utils/perlin_noise.hpp"
 
+#include <map>
 #include <unordered_map>
 #include <map>
 #include <glm/glm.hpp>
+#include <atomic>
 
 #include <vulkan/vulkan.h>
 
@@ -52,6 +54,7 @@ class Chunk {
         std::vector<uint32_t> indices;
         const siv::PerlinNoise::seed_type seed = 123456u;
         const siv::PerlinNoise perlin{ seed };
+		const std::unordered_map<glm::ivec3, Chunk*>& chunkMap;
 
 		std::vector<Direction> getVisibleFaces(int x, int y, int z);
 
@@ -64,9 +67,9 @@ class Chunk {
 		void initTerrain();
 
     public:
-        Chunk(int x, int y, int z);
+        Chunk(int x, int y, int z, const std::unordered_map<glm::ivec3, Chunk*>& m);
 
-		Chunk(glm::ivec3 pos);
+		Chunk(glm::ivec3 pos, const std::unordered_map<glm::ivec3, Chunk*>& m);
 
 		std::vector<BlockVertex>& getVertices();
 
@@ -77,4 +80,15 @@ class Chunk {
 		std::vector<glm::ivec3> getBlockPositions();
 
 		static glm::ivec3 findChunkIndex(glm::vec3 position, const std::unordered_map<glm::ivec3, Chunk*> & chunkMap );
+
+		void clear();
 };
+
+void chunkGeneratorFunction(
+	std::unordered_map<glm::ivec3, Chunk*>& chunkMap,
+	std::queue<glm::ivec3>& inQ,
+	std::mutex& inM,
+	std::condition_variable& inC,
+	std::queue <std::pair<glm::ivec3, Chunk*>>& outQ,
+	std::mutex& outM,
+	std::atomic_bool& isThreadStopped);
