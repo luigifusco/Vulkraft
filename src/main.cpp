@@ -186,6 +186,7 @@ private:
 
 
     std::unordered_map<glm::ivec3, Chunk*> chunkMap = { std::pair(glm::ivec3(0, 0, 0), new Chunk(0, 0, 0, chunkMap)) };
+    std::mutex mapM;
 
     std::mutex inM, outM;
     std::queue<glm::ivec3> inQ;
@@ -229,6 +230,7 @@ private:
         createTextureImage();
         createTextureImageView();
         createTextureSampler();
+        buildAllChunks();
         drawAllChunks();
         createVertexBuffer();
         createIndexBuffer();
@@ -254,6 +256,7 @@ private:
         chunkThread = std::thread(
             chunkGeneratorFunction,
             std::ref(chunkMap),
+            std::ref(mapM),
             std::ref(inQ),
             std::ref(inM),
             std::ref(inC),
@@ -349,14 +352,13 @@ private:
             }
             newChunksDrawn = !newChunks.empty();
             for (auto& iter : newChunks) {
-                drawChunk(iter.second);
-                iter.second->clear();
                 chunkIndexesToAdd.erase(chunkIndexesToAdd.find(iter.first));
             }
 
             if (newChunksDrawn) {
-                createVertexBuffer();
-                createIndexBuffer();
+                drawAllChunks();
+                updateVertexBuffer();
+                updateIndexBuffer();
             }
         }
 
@@ -404,11 +406,24 @@ private:
         indices.insert(indices.end(), curIndices.begin(), curIndices.end());
     }
 
-    void drawAllChunks() {
+    void buildAllChunks() {
         for (auto& iter : chunkMap) {
             iter.second->build();
-            drawChunk(iter.second);
-            iter.second->clear();
+        }
+    }
+
+    void drawAllChunks() {
+        vertices.clear();
+        indices.clear();
+        std::vector<Chunk*> chunks;
+        {
+            std::unique_lock l(mapM);
+            for (auto& iter : chunkMap) {
+                chunks.push_back(iter.second);
+            }
+        }
+        for (auto& iter : chunks) {
+            drawChunk(iter);
         }
     }
 
@@ -1351,6 +1366,23 @@ private:
         vkFreeMemory(device, stagingBufferMemory, nullptr);
     }
 
+    void updateVertexBuffer() {
+        VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingBufferMemory;
+        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+        void* data;
+        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+        memcpy(data, vertices.data(), (size_t)bufferSize);
+        vkUnmapMemory(device, stagingBufferMemory);
+
+        copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+
+        vkDestroyBuffer(device, stagingBuffer, nullptr);
+        vkFreeMemory(device, stagingBufferMemory, nullptr);
+    }
+
     void createIndexBuffer() {
         VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
 
@@ -1364,6 +1396,24 @@ private:
         vkUnmapMemory(device, stagingBufferMemory);
 
         createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+
+        copyBuffer(stagingBuffer, indexBuffer, bufferSize);
+
+        vkDestroyBuffer(device, stagingBuffer, nullptr);
+        vkFreeMemory(device, stagingBufferMemory, nullptr);
+    }
+
+    void updateIndexBuffer() {
+        VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingBufferMemory;
+        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+        void* data;
+        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+        memcpy(data, indices.data(), (size_t)bufferSize);
+        vkUnmapMemory(device, stagingBufferMemory);
 
         copyBuffer(stagingBuffer, indexBuffer, bufferSize);
 

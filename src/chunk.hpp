@@ -83,10 +83,13 @@ class Chunk {
 		static glm::ivec3 findChunkIndex(glm::vec3 position, const std::unordered_map<glm::ivec3, Chunk*> & chunkMap );
 
 		void clear();
+
+		std::vector<std::pair<glm::ivec3, Chunk*>> getNeighbors();
 };
 
 void chunkGeneratorFunction(
 	std::unordered_map<glm::ivec3, Chunk*>& chunkMap,
+	std::mutex& mapM,
 	std::queue<glm::ivec3>& inQ,
 	std::mutex& inM,
 	std::condition_variable& inC,

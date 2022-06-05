@@ -189,8 +189,26 @@ void Chunk::clear() {
     indices.clear();
 }
 
+std::vector<std::pair<glm::ivec3, Chunk*>> Chunk::getNeighbors() {
+    std::vector<std::pair<glm::ivec3, Chunk*>> neighbors;
+    const int const xOff[] = { CHUNK_WIDTH, -CHUNK_WIDTH };
+    const int const zOff[] = {CHUNK_DEPTH, -CHUNK_DEPTH};
+    for (int i = 0; i < 2; ++i) {
+        for (int j = 0; j < 2; ++j) {
+            glm::ivec3 newVec = coordinates + glm::ivec3(CHUNK_WIDTH, 0, CHUNK_DEPTH);
+            auto iter = chunkMap.find(newVec);
+            if (iter != chunkMap.end())
+                neighbors.push_back(*iter);
+        }
+    }
+
+    return neighbors;
+}
+
+
 void chunkGeneratorFunction(
     std::unordered_map<glm::ivec3, Chunk*>& chunkMap,
+    std::mutex& mapM,
     std::queue<glm::ivec3>& inQ,
     std::mutex& inM,
     std::condition_variable& inC,
@@ -206,9 +224,26 @@ void chunkGeneratorFunction(
             curPos = inQ.front();
             inQ.pop();
         }
-        Chunk* newChunk = new Chunk(curPos, chunkMap);
-        newChunk->build();
-        chunkMap.insert(std::pair(curPos, newChunk));
+
+        auto iter = chunkMap.find(curPos);
+        Chunk* newChunk;
+        if (iter == chunkMap.end()) { // build new chunk
+            newChunk = new Chunk(curPos, chunkMap);
+            newChunk->build();
+            {
+                std::unique_lock l(mapM);
+                chunkMap.insert(std::pair(curPos, newChunk));
+            }
+            std::vector<std::pair<glm::ivec3, Chunk*>> neighbors = newChunk->getNeighbors();
+            for (auto c : neighbors) {
+                c.second->build();
+            }
+        }
+        else { // rebuild chunk
+            newChunk = iter->second;
+            newChunk->build();
+        }
+
         {
             std::unique_lock l(outM);
             outQ.push(std::pair(curPos, newChunk));
