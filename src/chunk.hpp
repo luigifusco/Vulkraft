@@ -6,6 +6,7 @@
 #include <map>
 #include <unordered_map>
 #include <glm/glm.hpp>
+#include <atomic>
 
 const int CHUNK_HEIGHT = 32;
 const int CHUNK_WIDTH = 32;
@@ -75,3 +76,12 @@ class Chunk {
 
 		void clear();
 };
+
+void chunkGeneratorFunction(
+	std::unordered_map<glm::ivec3, Chunk*>& chunkMap,
+	std::queue<glm::ivec3>& inQ,
+	std::mutex& inM,
+	std::condition_variable& inC,
+	std::queue <std::pair<glm::ivec3, Chunk*>>& outQ,
+	std::mutex& outM,
+	std::atomic_bool& isThreadStopped);

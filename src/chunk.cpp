@@ -8,6 +8,10 @@
 #include <glm/gtx/hash.hpp>
 
 #include <iostream>
+#include <queue>
+#include <mutex>
+#include <condition_variable>
+#include <atomic>
 
 
 #include "blocks/block.hpp"
@@ -183,4 +187,31 @@ void Chunk::build() {
 void Chunk::clear() {
     vertices.clear();
     indices.clear();
+}
+
+void chunkGeneratorFunction(
+    std::unordered_map<glm::ivec3, Chunk*>& chunkMap,
+    std::queue<glm::ivec3>& inQ,
+    std::mutex& inM,
+    std::condition_variable& inC,
+    std::queue <std::pair<glm::ivec3, Chunk*>>& outQ,
+    std::mutex& outM,
+    std::atomic_bool& isThreadStopped) {
+    while (!isThreadStopped) {
+        glm::ivec3 curPos;
+        {
+            std::unique_lock l(inM);
+            while (inQ.empty())
+                inC.wait(l);
+            curPos = inQ.front();
+            inQ.pop();
+        }
+        Chunk* newChunk = new Chunk(curPos, chunkMap);
+        newChunk->build();
+        chunkMap.insert(std::pair(curPos, newChunk));
+        {
+            std::unique_lock l(outM);
+            outQ.push(std::pair(curPos, newChunk));
+        }
+    }
 }

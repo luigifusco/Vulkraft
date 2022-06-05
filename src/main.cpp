@@ -30,6 +30,12 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <cmath>
+#include <thread>
+#include <queue>
+#include <mutex>
+#include <condition_variable>
+#include <functional>
+#include <atomic>
 
 #include "chunk.hpp"
 
@@ -177,7 +183,17 @@ private:
     bool framebufferResized = false;
     bool cursorEnabled = true;
 
+
     std::unordered_map<glm::ivec3, Chunk*> chunkMap = { std::pair(glm::ivec3(0, 0, 0), new Chunk(0, 0, 0, chunkMap)) };
+
+    std::mutex inM, outM;
+    std::queue<glm::ivec3> inQ;
+    std::queue<std::pair<glm::ivec3, Chunk*>> outQ;
+    std::condition_variable inC;
+    std::atomic_bool isThreadStopped = false;
+
+    std::thread chunkThread;
+
 
     void initWindow() {
         glfwInit();
@@ -233,12 +249,31 @@ private:
     }
 
     void mainLoop() {
+
+        chunkThread = std::thread(
+            chunkGeneratorFunction,
+            std::ref(chunkMap),
+            std::ref(inQ),
+            std::ref(inM),
+            std::ref(inC),
+            std::ref(outQ),
+            std::ref(outM),
+            std::ref(isThreadStopped));
+
         toggleCursor();
 
         while (!glfwWindowShouldClose(window)) {
             glfwPollEvents();
             drawFrame();
         }
+
+        isThreadStopped = true;
+        {
+            std::unique_lock l(inM);
+            inQ.push(glm::ivec3(0));
+            inC.notify_all();
+        }
+        chunkThread.join();
 
         vkDeviceWaitIdle(device);
     }
@@ -354,24 +389,36 @@ private:
                 if (chunkMap.find(curChunkIndex) == chunkMap.end()) {
                     if (chunkIndexesToAdd.find(curChunkIndex) == chunkIndexesToAdd.end()) {
                         chunkIndexesToAdd.insert(curChunkIndex);
+                        {
+                            std::unique_lock l(inM);
+                            inQ.push(curChunkIndex);
+                            inC.notify_all();
+                        }
                     }
                 }
             }
         }
+        bool newChunksDrawn = false;
         if (chunkIndexesToAdd.size()) {
-            auto iter = chunkIndexesToAdd.begin();
-            glm::ivec3 curChunkIndex = *iter;
-            chunkIndexesToAdd.erase(iter);
-            Chunk* newChunk = new Chunk(curChunkIndex, chunkMap);
-            chunkMap.insert(std::pair(curChunkIndex, newChunk));
+            std::vector<std::pair<glm::ivec3, Chunk*>> newChunks;
+            {
+                std::unique_lock l(outM);
+                while (!outQ.empty()) {
+                    newChunks.push_back(outQ.front());
+                    outQ.pop();
+                }
+            }
+            newChunksDrawn = !newChunks.empty();
+            for (auto& iter : newChunks) {
+                drawChunk(iter.second);
+                iter.second->clear();
+                chunkIndexesToAdd.erase(chunkIndexesToAdd.find(iter.first));
+            }
 
-            newChunk->build();
-            drawChunk(newChunk);
-            newChunk->clear();
-
-
-            createVertexBuffer();
-            createIndexBuffer();
+            if (newChunksDrawn) {
+                createVertexBuffer();
+                createIndexBuffer();
+            }
         }
 
         sunDir = (glm::rotate(glm::mat4(1.0f), SUN_SPEED, glm::vec3(1, 0, 0)) * glm::vec4(sunDir, 1.0f));
