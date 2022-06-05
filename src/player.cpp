@@ -41,13 +41,13 @@ void Player::update(float deltaT, const std::unordered_map<glm::ivec3, Chunk*> &
 
 
     if(collision){
-        std::vector<glm::vec3> axes = {glm::vec3(1,0,0),glm::vec3(0,1,0),glm::vec3(0,0,1)};
+        static const std::vector<glm::vec3> axes = {glm::vec3(1,0,0),glm::vec3(0,1,0),glm::vec3(0,0,1)};
 
+        //correct direction relative to cam angle
+        glm::vec3 direction = glm::vec3(glm::rotate(glm::mat4(1.0f), currentAngle.y, glm::vec3(0.0f, 1.0f, 0.0f)) * glm::vec4(movement.x, movement.y, movement.z, 1));
         for(const auto & axis : axes){
-            glm::vec3 movementInAxis = movement * axis;
-            //correct direction relative to cam angle
-            glm::vec3 direction = glm::vec3(glm::rotate(glm::mat4(1.0f), currentAngle.y, glm::vec3(0.0f, 1.0f, 0.0f)) * glm::vec4(movementInAxis.x, movementInAxis.y, movementInAxis.z, 1));
-            if(Movement::canMove(camera.getPosition(), direction, chunkMap)){
+            glm::vec3 movementInAxis = direction * axis;
+            if(Movement::canMove(camera.getPosition(), movementInAxis, chunkMap)){
                 newDirection += movementInAxis;
             }
         }
