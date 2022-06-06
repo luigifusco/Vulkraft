@@ -21,7 +21,7 @@ void Camera::setPosition(glm::vec3 position){
 }
 
 void Camera::updatePosition(glm::vec3 direction){
-    CamPos += glm::vec3(glm::rotate(glm::mat4(1.0f), CamAng.y, glm::vec3(0.0f, 1.0f, 0.0f)) * glm::vec4(direction.x, direction.y, direction.z, 1));
+    CamPos += direction;
 }
 
 glm::vec3 Camera::getAngle(){

@@ -219,8 +219,10 @@ void chunkGeneratorFunction(
         glm::ivec3 curPos;
         {
             std::unique_lock l(inM);
-            while (inQ.empty())
+            while (inQ.empty()) {
                 inC.wait(l);
+                if (isThreadStopped) return;
+            }
             curPos = inQ.front();
             inQ.pop();
         }

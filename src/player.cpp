@@ -52,6 +52,8 @@ void Player::update(float deltaT, const std::unordered_map<glm::ivec3, Chunk*> &
             }
         }
 
+    } else {
+        newDirection = glm::vec3(glm::rotate(glm::mat4(1.0f), currentAngle.y, glm::vec3(0.0f, 1.0f, 0.0f)) * glm::vec4(movement.x, movement.y, movement.z, 1));;
     }
 
 
