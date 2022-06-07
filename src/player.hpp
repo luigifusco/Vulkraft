@@ -12,9 +12,9 @@
 class Player{
     private:
         Camera& camera;
-        const float speed = 5.0f;
-        bool collision =  true;
-        bool gravity = true;
+        const float speed = 50.0f;
+        bool collision =  false;
+        bool gravity = false;
         bool canJump = false;
         const float gravityFactor = 0.98f;
         const float jumpFactor = gravityFactor;

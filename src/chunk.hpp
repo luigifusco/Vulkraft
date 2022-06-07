@@ -53,8 +53,6 @@ class Chunk {
         glm::ivec3 coordinates;
         std::vector<BlockVertex> vertices;
         std::vector<uint32_t> indices;
-        const siv::PerlinNoise::seed_type seed = 123456u;
-        const siv::PerlinNoise perlin{ seed };
 		const std::unordered_map<glm::ivec3, Chunk*>& chunkMap;
 
 		std::vector<Direction> getVisibleFaces(int x, int y, int z);
@@ -63,18 +61,20 @@ class Chunk {
 	
 		void buildBlock(int x, int y, int z);
 
-		int sampleHeight(int x, int z);
+		int sampleHeight(int x, int z, float depth);
 
 		void initTerrain();
 
     public:
+        static siv::PerlinNoise::seed_type seed;
+        static siv::PerlinNoise perlin;
         Chunk(int x, int y, int z, const std::unordered_map<glm::ivec3, Chunk*>& m);
 
 		Chunk(glm::ivec3 pos, const std::unordered_map<glm::ivec3, Chunk*>& m);
 
-		std::vector<BlockVertex>& getVertices();
+		std::vector<BlockVertex> getVertices();
 
-		std::vector<uint32_t>& getIndices();
+		std::vector<uint32_t> getIndices();
 
         void build();
 
@@ -83,13 +83,19 @@ class Chunk {
 		static glm::ivec3 findChunkIndex(glm::vec3 position, const std::unordered_map<glm::ivec3, Chunk*> & chunkMap );
 
 		void clear();
+
+		std::vector<std::pair<glm::ivec3, Chunk*>> getNeighbors();
+
+		static void setSeed(unsigned int seedIn);
 };
 
 void chunkGeneratorFunction(
 	std::unordered_map<glm::ivec3, Chunk*>& chunkMap,
+	std::mutex& mapM,
 	std::queue<glm::ivec3>& inQ,
 	std::mutex& inM,
 	std::condition_variable& inC,
-	std::queue <std::pair<glm::ivec3, Chunk*>>& outQ,
+	std::queue<glm::ivec3>& outQ,
 	std::mutex& outM,
-	std::atomic_bool& isThreadStopped);
+	std::atomic_bool& isThreadStopped,
+	std::atomic_bool& threadProcessing);
