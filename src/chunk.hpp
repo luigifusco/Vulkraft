@@ -12,10 +12,10 @@
 
 #include <vulkan/vulkan.h>
 
-const int CHUNK_HEIGHT = 32;
+const int CHUNK_HEIGHT = 64;
 const int CHUNK_WIDTH = 32;
 const int CHUNK_DEPTH = 32;
-const bool SHOW_CHUNK_BORDER = false;
+const bool SHOW_CHUNK_BORDER = true;
 
 
 struct BlockVertex {

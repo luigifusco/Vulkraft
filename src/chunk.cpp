@@ -75,6 +75,16 @@ std::array<VkVertexInputAttributeDescription, 3> BlockVertex::getAttributeDescri
 std::vector<Direction> Chunk::getVisibleFaces(int x, int y, int z) {
     Block block = blocks[x][y][z];
     std::vector<Direction> faces;
+
+    if(SHOW_CHUNK_BORDER) {
+        if(x == 0 && (y == 0 || z == 0 || y == CHUNK_HEIGHT - 1 || z == CHUNK_DEPTH - 1)) faces.push_back(Direction::West);
+        if(y == 0 && (x == 0 || z == 0 || x == CHUNK_WIDTH - 1 || z == CHUNK_DEPTH - 1)) faces.push_back(Direction::Down);
+        if(z == 0 && (x == 0 || y == 0 || x == CHUNK_WIDTH - 1 || y == CHUNK_HEIGHT - 1)) faces.push_back(Direction::South);
+        if(x == CHUNK_WIDTH - 1 && (y == 0 || z == 0 || y == CHUNK_HEIGHT - 1 || z == CHUNK_DEPTH - 1)) faces.push_back(Direction::East);
+        if(y == CHUNK_HEIGHT - 1 && (x == 0 || z == 0 || x == CHUNK_WIDTH - 1 || z == CHUNK_DEPTH - 1)) faces.push_back(Direction::Up);
+        if(z == CHUNK_DEPTH - 1 && (x == 0 || y == 0 || x == CHUNK_WIDTH - 1 || y == CHUNK_HEIGHT - 1)) faces.push_back(Direction::North);
+    }
+
     if(!block.type->isVisible()) return faces;
     if (x == 0) {
         glm::ivec3 wIndex(coordinates.x - CHUNK_WIDTH, coordinates.y, coordinates.z);
@@ -157,11 +167,7 @@ void Chunk::initTerrain() {
             for (int y = midY; y < maxY; ++y) {
                 blocks[x][y][z].type = (BlockType*) DIRT;
             }
-            if(SHOW_CHUNK_BORDER && (x == 0 || z == 0)) {
-                blocks[x][maxY][z].type = (BlockType*) DIRT;
-            } else {
-                blocks[x][maxY][z].type = (BlockType*) GRASS;
-            }
+            blocks[x][maxY][z].type = (BlockType*) GRASS;
         }
     }
 }
