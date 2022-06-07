@@ -183,8 +183,6 @@ private:
     std::vector<VkFence> inFlightFences;
     uint32_t currentFrame = 0;
 
-    Camera camera = Camera();
-    Player player = Player(camera);
 
     glm::vec3 sunDir;
 
@@ -204,6 +202,8 @@ private:
 
     std::thread chunkThread;
 
+    Camera camera{};
+    Player player{std::ref(camera) , std::ref(chunkMap)};
 
     void initWindow() {
         glfwInit();
@@ -314,7 +314,7 @@ private:
 
         if(!cursorEnabled) {
 			player.cursorPositionEventListener(window);
-            player.keyEventListener(window , deltaT, chunkMap);
+            player.keyEventListener(window , deltaT);
         }
 
 		

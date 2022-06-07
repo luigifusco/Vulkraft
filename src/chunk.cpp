@@ -200,8 +200,8 @@ void Chunk::clear() {
 
 std::vector<std::pair<glm::ivec3, Chunk*>> Chunk::getNeighbors() {
     std::vector<std::pair<glm::ivec3, Chunk*>> neighbors;
-    const int const xOff[] = { CHUNK_WIDTH, -CHUNK_WIDTH };
-    const int const zOff[] = {CHUNK_DEPTH, -CHUNK_DEPTH};
+    const int  xOff[] = { CHUNK_WIDTH, -CHUNK_WIDTH };
+    const int  zOff[] = {CHUNK_DEPTH, -CHUNK_DEPTH};
     for (int i = 0; i < 2; ++i) {
         for (int j = 0; j < 2; ++j) {
             glm::ivec3 newVec = coordinates + glm::ivec3(xOff[i], 0, zOff[j]);
@@ -294,6 +294,13 @@ std::vector<glm::ivec3> Chunk::getBlockPositions(){
 
     return positions;
 
+}
+
+bool Chunk::isBlockVisible(glm::ivec3 position){
+    std::cout << position.x << " " << position.y << " " << position.z << std::endl;
+    position -= coordinates;
+
+    return blocks[position.x][position.y][position.z].type->isVisible();
 }
 
 

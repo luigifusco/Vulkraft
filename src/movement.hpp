@@ -19,6 +19,10 @@ namespace MovementDirection {
 
 namespace Movement {
 
+    static const float numSteps = 3.0f;
+
     bool canMove(const glm::vec3 & position , const glm::vec3 & direction, const std::unordered_map<glm::ivec3, Chunk*> &chunkMap);
+
+    glm::vec3 resolveCollision(const glm::vec3& position , const glm::vec3& movement , const std::unordered_map<glm::ivec3, Chunk*> &chunkMap );
 
 }

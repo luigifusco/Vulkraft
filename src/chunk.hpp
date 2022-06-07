@@ -87,6 +87,8 @@ class Chunk {
 		std::vector<std::pair<glm::ivec3, Chunk*>> getNeighbors();
 
 		static void setSeed(unsigned int seedIn);
+		
+		bool isBlockVisible(glm::ivec3 position);
 };
 
 void chunkGeneratorFunction(

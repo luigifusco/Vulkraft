@@ -4,16 +4,16 @@
 
 #include <iostream>
 
-Player::Player(Camera &_camera) : camera(_camera){}
+Player::Player(Camera &_camera , std::unordered_map<glm::ivec3, Chunk*>& _chunkMap) : camera(_camera) , chunkMap(_chunkMap){}
 
 Player::~Player(){}
 
 
-void Player::update(float deltaT, const std::unordered_map<glm::ivec3, Chunk*> &chunkMap ){
+void Player::update(float deltaT){
     glm::vec3 currentPosition = camera.getPosition();
     glm::vec3 currentAngle = camera.getAngle();
     glm::vec3 movement(0);
-    glm::vec3 newDirection(0);
+    glm::vec3 finalMovement(0);
     
     
     if(movements.empty() && (gravity == false)) return;
@@ -21,10 +21,9 @@ void Player::update(float deltaT, const std::unordered_map<glm::ivec3, Chunk*> &
     if(gravity){
         gravityVector += glm::vec3(0,-1,0) * gravityFactor * deltaT;
 
-        if(Movement::canMove(currentPosition, gravityVector, chunkMap)){
-            newDirection += gravityVector;
-        }
-        else{
+        finalMovement = Movement::resolveCollision(currentPosition , gravityVector, chunkMap);
+
+        if(finalMovement == glm::vec3(0)){
             gravityVector = glm::vec3(0);
             canJump = true;
         }
@@ -47,25 +46,29 @@ void Player::update(float deltaT, const std::unordered_map<glm::ivec3, Chunk*> &
         for(const auto & axis : axes){
             glm::vec3 movementInAxis = movement * axis;
             //correct direction relative to cam angle
-            if(Movement::canMove(camera.getPosition(), movementInAxis, chunkMap)){
-                newDirection += movementInAxis;
-            }
+            finalMovement += Movement::resolveCollision(currentPosition, movementInAxis, chunkMap);
         }
 
     } else {
-        newDirection = glm::vec3(glm::rotate(glm::mat4(1.0f), currentAngle.y, glm::vec3(0.0f, 1.0f, 0.0f)) * glm::vec4(movement.x, movement.y, movement.z, 1));;
+        finalMovement = glm::vec3(glm::rotate(glm::mat4(1.0f), currentAngle.y, glm::vec3(0.0f, 1.0f, 0.0f)) * glm::vec4(movement.x, movement.y, movement.z, 1));;
     }
 
+    // std::cout << "Start : " << currentPosition.x << "   " << currentPosition.y << "   " << currentPosition.z  << " Move: " << finalMovement.x<< "   " << finalMovement.y<< "   " << finalMovement.z << " Norm: " << glm::normalize(finalMovement).x << "   " << glm::normalize(finalMovement).y << "   " << glm::normalize(finalMovement).z << std::endl;
 
-
-    camera.updatePosition(newDirection);
+    camera.updatePosition(finalMovement);
 
 }
 
 
 
-void Player::keyEventListener(GLFWwindow* window , float deltaT , const std::unordered_map<glm::ivec3, Chunk*> &chunkMap ){
+void Player::keyEventListener(GLFWwindow* window , float deltaT ){
     movements.clear();
+    
+    if(glfwGetKey(window, GLFW_KEY_P)) {
+        collision = !collision;
+        gravity = !gravity;
+    }
+       
     if(glfwGetKey(window, GLFW_KEY_A)) {
         movements.insert(MovementDirection::Left);
     }
@@ -92,8 +95,9 @@ void Player::keyEventListener(GLFWwindow* window , float deltaT , const std::uno
             movements.insert(MovementDirection::Up);
         }
     }
+    
 
-    update(deltaT , chunkMap);
+    update(deltaT);
 
 
 }
