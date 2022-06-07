@@ -101,8 +101,12 @@ struct VertexUniformBufferObject {
 };
 
 struct FragmentUniformBufferObject {
-    alignas(16) glm::vec3 lightDir;
+    alignas(16) glm::vec3 lightDir0;
+    alignas(16) glm::vec3 lightCol0;
+    alignas(16) glm::vec3 lightDir1;
+    alignas(16) glm::vec3 lightCol1;
     alignas(16) glm::vec3 eyePos;
+    alignas(16) glm::vec2 ambFactor;
 };
 
 class HelloTriangleApplication {
@@ -407,10 +411,16 @@ private:
         vubo.view = player.getCamera().getMatrix();
         vubo.proj = Prj;
 
-        FragmentUniformBufferObject fubo{};
-        fubo.lightDir = sunDir;
+        const float threshold = 0.75f;
+        float visibility = std::clamp(sunDir.y, -threshold, 0.0f) / threshold + 1;
+
+        FragmentUniformBufferObject fubo{};        
+        fubo.lightDir0 = sunDir;
+        fubo.lightCol0 = glm::vec3(0.8f) * visibility;
+        fubo.lightDir1 = sunDir * -1.0f;
+        fubo.lightCol1 = glm::vec3(0.1f) * (1 - visibility);
+        fubo.ambFactor = glm::vec2(visibility * 0.175 + (1 - visibility) * 0.025);
         fubo.eyePos = player.getCamera().getPosition();
-        //fubo.lightDir = glm::normalize(glm::vec3(1, 1, 2));
 
 
 		void* data;
@@ -1679,11 +1689,10 @@ private:
         renderPassInfo.renderArea.offset = {0, 0};
         renderPassInfo.renderArea.extent = swapChainExtent;
 
-        const glm::vec3 DAY(0.179f, 0.773f, 0.906f);
-        const glm::vec3 NIGHT(0.0195f, 0.0195f, 0.1289f);
+        const glm::vec3 DAY = glm::vec3(45.f, 197.f, 231.f) / 255.f;
+        const glm::vec3 NIGHT = glm::vec3(1.f, 1.f, 8.f) / 255.f;
 
-        float ratio = (glm::dot(sunDir, glm::vec3(0.f, 1.f, 0.f)) + 1.f) / 2.f;
-
+        float ratio = (std::clamp(sunDir.y, -0.75f, 0.75f) + 0.75f) / 1.5f;
         glm::vec3 finalColor = DAY * ratio + NIGHT * (1 - ratio);
 
         std::array<VkClearValue, 2> clearValues{};
