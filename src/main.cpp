@@ -186,7 +186,7 @@ private:
     bool cursorEnabled = true;
 
 
-    std::unordered_map<glm::ivec3, Chunk*> chunkMap = { std::pair(glm::ivec3(0, 0, 0), new Chunk(0, 0, 0, chunkMap)) };
+    std::unordered_map<glm::ivec3, Chunk*> chunkMap;
     std::mutex mapM;
 
     std::mutex inM, outM;
@@ -232,7 +232,7 @@ private:
         createTextureImage();
         createTextureImageView();
         createTextureSampler();
-        buildAllChunks();
+        initializeChunks();
         drawAllChunks();
         createVertexBuffer();
         createIndexBuffer();
@@ -326,6 +326,7 @@ private:
             isThreadStopped = true;
             inC.notify_one();
             chunkThread.join();
+            Chunk::setSeed(rand());
             isThreadStopped = false;
             chunkThread = std::thread(
                 chunkGeneratorFunction,
@@ -435,7 +436,9 @@ private:
         vertices.insert(vertices.end(), curVertices.begin(), curVertices.end());
     }
 
-    void buildAllChunks() {
+    void initializeChunks() {
+        Chunk::setSeed(rand());
+        chunkMap.insert(std::pair(glm::ivec3(0, 0, 0), new Chunk(0, 0, 0, chunkMap)));
         for (auto& iter : chunkMap) {
             iter.second->build();
         }

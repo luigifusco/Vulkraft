@@ -21,6 +21,8 @@
 #include "utils/perlin_noise.hpp"
 #include "chunk.hpp"
 
+siv::PerlinNoise::seed_type Chunk::seed = 0;
+siv::PerlinNoise Chunk::perlin{ 0 };
 
 /* singleton block definition */
 const Air* AIR = new Air();
@@ -133,7 +135,7 @@ void Chunk::buildBlock(int x, int y, int z) {
 int Chunk::sampleHeight(int x, int z) {
     static const int octaves = 20;
     static const int minHeight = 16;
-    static const float varY = 20.0;
+    static const float varY = 30.0;
 
     float dx = (float)(x + coordinates.x) / CHUNK_WIDTH;
     float dz = (float)(z + coordinates.z) / CHUNK_DEPTH;
@@ -205,6 +207,11 @@ std::vector<std::pair<glm::ivec3, Chunk*>> Chunk::getNeighbors() {
     }
 
     return neighbors;
+}
+
+void Chunk::setSeed(unsigned int seedIn) {
+    Chunk::seed = seedIn;
+    Chunk::perlin = siv::PerlinNoise{ Chunk::seed };
 }
 
 
