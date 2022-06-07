@@ -72,9 +72,9 @@ class Chunk {
 
 		Chunk(glm::ivec3 pos, const std::unordered_map<glm::ivec3, Chunk*>& m);
 
-		std::vector<BlockVertex>& getVertices();
+		std::vector<BlockVertex> getVertices();
 
-		std::vector<uint32_t>& getIndices();
+		std::vector<uint32_t> getIndices();
 
         void build();
 
@@ -95,4 +95,5 @@ void chunkGeneratorFunction(
 	std::condition_variable& inC,
 	std::queue <std::pair<glm::ivec3, Chunk*>>& outQ,
 	std::mutex& outM,
-	std::atomic_bool& isThreadStopped);
+	std::atomic_bool& isThreadStopped,
+	std::atomic_bool& threadProcessing);

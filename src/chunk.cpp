@@ -13,6 +13,8 @@
 #include <condition_variable>
 #include <atomic>
 
+#include <iostream>
+
 
 #include "blocks/block.hpp"
 #include "utils/enums.hpp"
@@ -69,12 +71,12 @@ std::array<VkVertexInputAttributeDescription, 3> BlockVertex::getAttributeDescri
 
 std::vector<Direction> Chunk::getVisibleFaces(int x, int y, int z) {
     Block block = blocks[x][y][z];
-    if(!block.type->isVisible()) return {};
     std::vector<Direction> faces;
+    if(!block.type->isVisible()) return faces;
     if (x == 0) {
         glm::ivec3 wIndex(coordinates.x - CHUNK_WIDTH, coordinates.y, coordinates.z);
         auto iter = chunkMap.find(wIndex);
-        if (iter == chunkMap.end() || !iter->second->blocks[CHUNK_WIDTH - 1][y][z].type->isOpaque) faces.push_back(Direction::West);
+        if (iter != chunkMap.end() && !iter->second->blocks[CHUNK_WIDTH - 1][y][z].type->isOpaque) faces.push_back(Direction::West);
     } else if (!blocks[x - 1][y][z].type->isOpaque) faces.push_back(Direction::West);
 
     if(y == 0 || !blocks[x][y - 1][z].type->isOpaque) faces.push_back(Direction::Down);
@@ -82,13 +84,13 @@ std::vector<Direction> Chunk::getVisibleFaces(int x, int y, int z) {
     if (z == 0) {
         glm::ivec3 sIndex(coordinates.x, coordinates.y, coordinates.z - CHUNK_DEPTH);
         auto iter = chunkMap.find(sIndex);
-        if (iter == chunkMap.end() || !iter->second->blocks[x][y][CHUNK_DEPTH - 1].type->isOpaque) faces.push_back(Direction::South);
+        if (iter != chunkMap.end() && !iter->second->blocks[x][y][CHUNK_DEPTH - 1].type->isOpaque) faces.push_back(Direction::South);
     } else if (!blocks[x][y][z - 1].type->isOpaque) faces.push_back(Direction::South);
 
     if (x == CHUNK_WIDTH - 1) {
         glm::ivec3 eIndex(coordinates.x + CHUNK_WIDTH, coordinates.y, coordinates.z);
         auto iter = chunkMap.find(eIndex);
-        if (iter == chunkMap.end() || !iter->second->blocks[0][y][z].type->isOpaque) faces.push_back(Direction::East);
+        if (iter != chunkMap.end() && !iter->second->blocks[0][y][z].type->isOpaque) faces.push_back(Direction::East);
     } else if (!blocks[x + 1][y][z].type->isOpaque) faces.push_back(Direction::East);
 
     if(y == CHUNK_HEIGHT - 1 || !blocks[x][y + 1][z].type->isOpaque) faces.push_back(Direction::Up);
@@ -96,7 +98,7 @@ std::vector<Direction> Chunk::getVisibleFaces(int x, int y, int z) {
     if (z == CHUNK_DEPTH - 1) {
         glm::ivec3 nIndex(coordinates.x, coordinates.y, coordinates.z + CHUNK_DEPTH);
         auto iter = chunkMap.find(nIndex);
-        if (iter == chunkMap.end() || !iter->second->blocks[x][y][0].type->isOpaque) faces.push_back(Direction::North);
+        if (iter != chunkMap.end() && !iter->second->blocks[x][y][0].type->isOpaque) faces.push_back(Direction::North);
     } else if (!blocks[x][y][z + 1].type->isOpaque) faces.push_back(Direction::North);
 
     return faces;
@@ -164,11 +166,11 @@ Chunk::Chunk(glm::ivec3 pos, const std::unordered_map<glm::ivec3, Chunk*>& m) : 
 
 Chunk::Chunk(int x, int y, int z, const std::unordered_map<glm::ivec3, Chunk*>& m) : Chunk(glm::ivec3(x, y, z), m) {}
 
-std::vector<BlockVertex>& Chunk::getVertices() {
+std::vector<BlockVertex> Chunk::getVertices() {
     return vertices;
 }
 
-std::vector<uint32_t>& Chunk::getIndices() {
+std::vector<uint32_t> Chunk::getIndices() {
     return indices;
 }
 
@@ -195,7 +197,7 @@ std::vector<std::pair<glm::ivec3, Chunk*>> Chunk::getNeighbors() {
     const int const zOff[] = {CHUNK_DEPTH, -CHUNK_DEPTH};
     for (int i = 0; i < 2; ++i) {
         for (int j = 0; j < 2; ++j) {
-            glm::ivec3 newVec = coordinates + glm::ivec3(CHUNK_WIDTH, 0, CHUNK_DEPTH);
+            glm::ivec3 newVec = coordinates + glm::ivec3(xOff[i], 0, zOff[j]);
             auto iter = chunkMap.find(newVec);
             if (iter != chunkMap.end())
                 neighbors.push_back(*iter);
@@ -214,12 +216,14 @@ void chunkGeneratorFunction(
     std::condition_variable& inC,
     std::queue <std::pair<glm::ivec3, Chunk*>>& outQ,
     std::mutex& outM,
-    std::atomic_bool& isThreadStopped) {
+    std::atomic_bool& isThreadStopped,
+    std::atomic_bool& threadProcessing) {
     while (!isThreadStopped) {
         glm::ivec3 curPos;
         {
             std::unique_lock l(inM);
             while (inQ.empty()) {
+                threadProcessing = false;
                 inC.wait(l);
                 if (isThreadStopped) return;
             }
@@ -230,6 +234,7 @@ void chunkGeneratorFunction(
         auto iter = chunkMap.find(curPos);
         Chunk* newChunk;
         if (iter == chunkMap.end()) { // build new chunk
+            threadProcessing = true;
             newChunk = new Chunk(curPos, chunkMap);
             newChunk->build();
             {
@@ -237,9 +242,11 @@ void chunkGeneratorFunction(
                 chunkMap.insert(std::pair(curPos, newChunk));
             }
             std::vector<std::pair<glm::ivec3, Chunk*>> neighbors = newChunk->getNeighbors();
-            for (auto c : neighbors) {
+            for (auto& c : neighbors) {
                 c.second->build();
             }
+            std::cout << std::endl;
+
         }
         else { // rebuild chunk
             newChunk = iter->second;

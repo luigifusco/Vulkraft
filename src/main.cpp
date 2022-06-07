@@ -194,6 +194,7 @@ private:
     std::queue<std::pair<glm::ivec3, Chunk*>> outQ;
     std::condition_variable inC;
     std::atomic_bool isThreadStopped = false;
+    std::atomic_bool threadProcessing = false;
 
     std::thread chunkThread;
 
@@ -263,7 +264,8 @@ private:
             std::ref(inC),
             std::ref(outQ),
             std::ref(outM),
-            std::ref(isThreadStopped));
+            std::ref(isThreadStopped),
+            std::ref(threadProcessing));
 
         toggleCursor();
 
@@ -334,7 +336,8 @@ private:
                 std::ref(inC),
                 std::ref(outQ),
                 std::ref(outM),
-                std::ref(isThreadStopped));
+                std::ref(isThreadStopped),
+                std::ref(threadProcessing));
         }
 
         static std::unordered_set<glm::ivec3> chunkIndexesToAdd;
@@ -354,35 +357,36 @@ private:
                 }
             }
         }
-        bool newChunksDrawn = false;
-        if (chunkIndexesToAdd.size()) {
-            std::vector<std::pair<glm::ivec3, Chunk*>> newChunks;
-            {
-                std::unique_lock l(outM);
-                while (!outQ.empty()) {
-                    newChunks.push_back(outQ.front());
-                    outQ.pop();
+
+        if (!threadProcessing) {
+            bool newChunksDrawn = false;
+            if (chunkIndexesToAdd.size()) {
+                std::vector<std::pair<glm::ivec3, Chunk*>> newChunks;
+                {
+                    std::unique_lock l(outM);
+                    while (!outQ.empty()) {
+                        newChunks.push_back(outQ.front());
+                        outQ.pop();
+                    }
+                }
+                newChunksDrawn = !newChunks.empty();
+                for (auto& iter : newChunks) {
+                    chunkIndexesToAdd.erase(chunkIndexesToAdd.find(iter.first));
                 }
             }
-            newChunksDrawn = !newChunks.empty();
-            for (auto& iter : newChunks) {
-                chunkIndexesToAdd.erase(chunkIndexesToAdd.find(iter.first));
-            }
-        }
-
-        if (newChunksDrawn || bufferShouldUpdate[currentFrame]) {
-            clock_t initial = clock();
-            if (newChunksDrawn) {
-                drawAllChunks();
-            }
-            if (vertices.size()) {
-                updateVertexBuffer(currentFrame);
-                updateIndexBuffer(currentFrame);
-                bufferShouldUpdate[currentFrame] = false;
+            if (newChunksDrawn || bufferShouldUpdate[currentFrame]) {
                 if (newChunksDrawn) {
-                    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
-                        if (i == currentFrame) continue;
-                        bufferShouldUpdate[i] = true;
+                    drawAllChunks();
+                }
+                if (vertices.size()) {
+                    updateVertexBuffer(currentFrame);
+                    updateIndexBuffer(currentFrame);
+                    bufferShouldUpdate[currentFrame] = false;
+                    if (newChunksDrawn) {
+                        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
+                            if (i == currentFrame) continue;
+                            bufferShouldUpdate[i] = true;
+                        }
                     }
                 }
             }
@@ -421,8 +425,8 @@ private:
 	}
 
     void drawChunk(Chunk* newChunk) {
-        std::vector<BlockVertex>& curVertices = newChunk->getVertices();
-        std::vector<uint32_t>& curIndices = newChunk->getIndices();
+        std::vector<BlockVertex> curVertices = newChunk->getVertices();
+        std::vector<uint32_t> curIndices = newChunk->getIndices();
 
         indices.reserve(indices.size() + curIndices.size());
         for (int i = 0; i < curIndices.size(); ++i) {
