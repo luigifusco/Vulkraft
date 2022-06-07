@@ -133,24 +133,28 @@ void Chunk::buildBlock(int x, int y, int z) {
     }
 }
 
-int Chunk::sampleHeight(int x, int z) {
+int Chunk::sampleHeight(int x, int z, float depth) {
     static const int octaves = 20;
-    static const int minHeight = 16;
-    static const float varY = 30.0;
+    int minY = 16 * depth;
+    float varY = 30.0 * depth;
 
     float dx = (float)(x + coordinates.x) / CHUNK_WIDTH;
     float dz = (float)(z + coordinates.z) / CHUNK_DEPTH;
     
-    const float noise = varY * perlin.normalizedOctave2D(dx, dz, octaves);
-    return std::clamp(minHeight + (int)noise, 0, CHUNK_HEIGHT - 1);
+    const float noise = varY * perlin.normalizedOctave3D(dx, depth, dz, octaves);
+    return std::clamp(minY + (int)noise, 0, CHUNK_HEIGHT - 1);
 }
 
 void Chunk::initTerrain() {
     for (int x = 0; x < CHUNK_WIDTH; ++x) {
         for (int z = 0; z < CHUNK_DEPTH; ++z) {
-            int maxY = sampleHeight(x, z);
+            int midY = sampleHeight(x, z, 0.4);
+            int maxY = sampleHeight(x, z, 1.0);
             blocks[x][0][z].type = (BlockType*) BEDROCK;
-            for (int y = 1; y < maxY; ++y) {
+            for(int y = 1; y < midY; ++y) {
+                blocks[x][y][z].type = (BlockType*) STONE;
+            }
+            for (int y = midY; y < maxY; ++y) {
                 blocks[x][y][z].type = (BlockType*) DIRT;
             }
             if(SHOW_CHUNK_BORDER && (x == 0 || z == 0)) {

@@ -61,7 +61,7 @@ class Chunk {
 	
 		void buildBlock(int x, int y, int z);
 
-		int sampleHeight(int x, int z);
+		int sampleHeight(int x, int z, float depth);
 
 		void initTerrain();
 
