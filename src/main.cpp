@@ -182,6 +182,8 @@ private:
     Camera camera = Camera();
     Player player = Player(camera);
 
+    glm::vec3 sunDir;
+
     bool framebufferResized = false;
     bool cursorEnabled = true;
 
@@ -255,6 +257,8 @@ private:
 
     void mainLoop() {
 
+        sunDir = glm::vec3(0, 1, 0);
+
         chunkThread = std::thread(
             chunkGeneratorFunction,
             std::ref(chunkMap),
@@ -300,7 +304,6 @@ private:
             }
         }
 
-        static glm::vec3 sunDir(0, 1, 0);
         const float SUN_SPEED = glm::radians(0.3f);
 
 
@@ -1676,8 +1679,15 @@ private:
         renderPassInfo.renderArea.offset = {0, 0};
         renderPassInfo.renderArea.extent = swapChainExtent;
 
+        const glm::vec3 DAY(0.179f, 0.773f, 0.906f);
+        const glm::vec3 NIGHT(0.0195f, 0.0195f, 0.1289f);
+
+        float ratio = (glm::dot(sunDir, glm::vec3(0.f, 1.f, 0.f)) + 1.f) / 2.f;
+
+        glm::vec3 finalColor = DAY * ratio + NIGHT * (1 - ratio);
+
         std::array<VkClearValue, 2> clearValues{};
-        clearValues[0].color = {{0.179f, 0.773f, 0.906f, 1.0f}};
+        clearValues[0].color = {{finalColor.x, finalColor.y, finalColor.z, 1.0f}};
         clearValues[1].depthStencil = {1.0f, 0};
 
         renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
