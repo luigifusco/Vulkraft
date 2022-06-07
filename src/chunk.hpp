@@ -95,7 +95,7 @@ void chunkGeneratorFunction(
 	std::queue<glm::ivec3>& inQ,
 	std::mutex& inM,
 	std::condition_variable& inC,
-	std::queue <std::pair<glm::ivec3, Chunk*>>& outQ,
+	std::queue<glm::ivec3>& outQ,
 	std::mutex& outM,
 	std::atomic_bool& isThreadStopped,
 	std::atomic_bool& threadProcessing);

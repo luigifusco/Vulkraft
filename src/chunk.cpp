@@ -12,6 +12,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
+#include <unordered_set>
 
 #include <iostream>
 
@@ -221,12 +222,13 @@ void chunkGeneratorFunction(
     std::queue<glm::ivec3>& inQ,
     std::mutex& inM,
     std::condition_variable& inC,
-    std::queue <std::pair<glm::ivec3, Chunk*>>& outQ,
+    std::queue<glm::ivec3>& outQ,
     std::mutex& outM,
     std::atomic_bool& isThreadStopped,
     std::atomic_bool& threadProcessing) {
+
     while (!isThreadStopped) {
-        glm::ivec3 curPos;
+        std::vector<glm::ivec3> toBuild;
         {
             std::unique_lock l(inM);
             while (inQ.empty()) {
@@ -234,35 +236,41 @@ void chunkGeneratorFunction(
                 inC.wait(l);
                 if (isThreadStopped) return;
             }
-            curPos = inQ.front();
-            inQ.pop();
-        }
-
-        auto iter = chunkMap.find(curPos);
-        Chunk* newChunk;
-        if (iter == chunkMap.end()) { // build new chunk
-            threadProcessing = true;
-            newChunk = new Chunk(curPos, chunkMap);
-            newChunk->build();
-            {
-                std::unique_lock l(mapM);
-                chunkMap.insert(std::pair(curPos, newChunk));
+            while (!inQ.empty()) {
+                toBuild.push_back(inQ.front());
+                inQ.pop();
             }
-            std::vector<std::pair<glm::ivec3, Chunk*>> neighbors = newChunk->getNeighbors();
-            for (auto& c : neighbors) {
-                c.second->build();
+        }
+        std::unordered_set<Chunk*> toRebuild;
+        for (auto& curPos : toBuild) {
+            auto iter = chunkMap.find(curPos);
+            Chunk* newChunk;
+            if (iter == chunkMap.end()) { // build new chunk
+                threadProcessing = true;
+                newChunk = new Chunk(curPos, chunkMap);
+                newChunk->build();
+                {
+                    std::unique_lock l(mapM);
+                    chunkMap.insert(std::pair(curPos, newChunk));
+                }
+                std::vector<std::pair<glm::ivec3, Chunk*>> neighbors = newChunk->getNeighbors();
+                for (auto& c : neighbors) {
+                    toRebuild.insert(c.second);
+                }
             }
-            std::cout << std::endl;
-
-        }
-        else { // rebuild chunk
-            newChunk = iter->second;
-            newChunk->build();
+            else { // rebuild chunk
+                newChunk = iter->second;
+                newChunk->build();
+            }
         }
 
-        {
+        for (auto& c : toRebuild) {
+            c->build();
+        }
+
+        for (auto& curPos : toBuild) {
             std::unique_lock l(outM);
-            outQ.push(std::pair(curPos, newChunk));
+            outQ.push(curPos);
         }
     }
 }

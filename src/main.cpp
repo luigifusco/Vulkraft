@@ -191,7 +191,7 @@ private:
 
     std::mutex inM, outM;
     std::queue<glm::ivec3> inQ;
-    std::queue<std::pair<glm::ivec3, Chunk*>> outQ;
+    std::queue<glm::ivec3> outQ;
     std::condition_variable inC;
     std::atomic_bool isThreadStopped = false;
     std::atomic_bool threadProcessing = false;
@@ -362,7 +362,7 @@ private:
         if (!threadProcessing) {
             bool newChunksDrawn = false;
             if (chunkIndexesToAdd.size()) {
-                std::vector<std::pair<glm::ivec3, Chunk*>> newChunks;
+                std::vector<glm::ivec3> newChunks;
                 {
                     std::unique_lock l(outM);
                     while (!outQ.empty()) {
@@ -372,7 +372,7 @@ private:
                 }
                 newChunksDrawn = !newChunks.empty();
                 for (auto& iter : newChunks) {
-                    chunkIndexesToAdd.erase(chunkIndexesToAdd.find(iter.first));
+                    chunkIndexesToAdd.erase(chunkIndexesToAdd.find(iter));
                 }
             }
             if (newChunksDrawn || bufferShouldUpdate[currentFrame]) {
