@@ -296,21 +296,21 @@ void chunkGeneratorFunction(
                 inQ.pop();
             }
         }
-        std::unordered_set<Chunk*> toRebuild;
+        std::unordered_set<Chunk*> chunksToBuild;
         for (auto& curPos : toBuild) {
             auto iter = chunkMap.find(curPos);
             Chunk* newChunk;
             if (iter == chunkMap.end()) { // build new chunk
                 threadProcessing = true;
                 newChunk = new Chunk(curPos, chunkMap);
-                newChunk->build();
+                chunksToBuild.insert(newChunk);
                 {
                     std::unique_lock l(mapM);
                     chunkMap.insert(std::pair(curPos, newChunk));
                 }
                 std::vector<std::pair<glm::ivec3, Chunk*>> neighbors = newChunk->getNeighbors();
                 for (auto& c : neighbors) {
-                    toRebuild.insert(c.second);
+                    chunksToBuild.insert(c.second);
                 }
             }
             else { // rebuild chunk
@@ -319,7 +319,7 @@ void chunkGeneratorFunction(
             }
         }
 
-        for (auto& c : toRebuild) {
+        for (auto& c : chunksToBuild) {
             c->build();
         }
 
