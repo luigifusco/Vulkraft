@@ -25,4 +25,6 @@ namespace Movement {
 
     glm::vec3 resolveCollision(const glm::vec3& position , const glm::vec3& movement , const std::unordered_map<glm::ivec3, Chunk*> &chunkMap );
 
+    std::vector<glm::ivec3> getPositionsToCheck(glm::vec3 position);
+
 }
