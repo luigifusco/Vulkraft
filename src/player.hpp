@@ -14,8 +14,8 @@ class Player{
         Camera& camera;
         std::unordered_map<glm::ivec3, Chunk*>& chunkMap;
         const float speed = 5.0f;
-        bool collision =  false;
-        bool gravity = false;
+        bool collision =  true;
+        bool gravity = true;
         bool canJump = false;
         const float gravityFactor = 0.98f;
         const float jumpFactor = gravityFactor;
@@ -34,6 +34,7 @@ class Player{
 
         void keyEventListener(GLFWwindow* window , float deltaT);
         void cursorPositionEventListener(GLFWwindow* window);
+        void updatePhysics();
 
 
 };

@@ -60,14 +60,14 @@ void Player::update(float deltaT){
 }
 
 
+void Player::updatePhysics(){
+    collision = !collision;
+    gravity = !gravity;
+}
+
 
 void Player::keyEventListener(GLFWwindow* window , float deltaT ){
     movements.clear();
-    
-    if(glfwGetKey(window, GLFW_KEY_P)) {
-        collision = !collision;
-        gravity = !gravity;
-    }
        
     if(glfwGetKey(window, GLFW_KEY_A)) {
         movements.insert(MovementDirection::Left);

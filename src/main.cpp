@@ -317,7 +317,12 @@ private:
             player.keyEventListener(window , deltaT);
         }
 
-		
+        if(glfwGetKey(window, GLFW_KEY_P)) {
+            if(time - debounce > 0.33){
+                player.updatePhysics();
+                debounce = time;
+            }
+        }
 		
 
         if (glfwGetKey(window, GLFW_KEY_R)) {
