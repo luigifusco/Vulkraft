@@ -93,3 +93,23 @@ class Bedrock : public BlockType {
 
         glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
 };
+
+class Leaves : public BlockType {
+    public:
+        Leaves() : BlockType(true, false) {};
+
+        glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
+};
+
+/* singleton block definition */
+extern const Air* AIR;
+extern const Dirt* DIRT;
+extern const Grass* GRASS;
+extern const WoodLog* WOOD_LOG;
+extern const WoodPlank* WOOD_PLANK;
+extern const Stone* STONE;
+extern const Cobblestone* COBBLESTONE;
+extern const Sand* SAND;
+extern const Bedrock* BEDROCK;
+extern const Leaves* LEAVES;
+/* -------------------------  */

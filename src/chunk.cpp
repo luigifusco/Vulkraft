@@ -1,6 +1,5 @@
 #include <glm/glm.hpp>
 #include <vector>
-#include <map>
 #include <array>
 #include <unordered_map>
 
@@ -16,8 +15,8 @@
 
 #include <iostream>
 
-
 #include "blocks/block.hpp"
+#include "structures/structure.hpp"
 #include "utils/enums.hpp"
 #include "utils/perlin_noise.hpp"
 #include "chunk.hpp"
@@ -35,6 +34,7 @@ const Stone* STONE = new Stone();
 const Cobblestone* COBBLESTONE = new Cobblestone();
 const Sand* SAND = new Sand();
 const Bedrock* BEDROCK = new Bedrock();
+const Leaves* LEAVES = new Leaves();
 /* -------------------------  */
 
 Block::Block() {
@@ -143,6 +143,15 @@ void Chunk::buildBlock(int x, int y, int z) {
     }
 }
 
+void Chunk::buildStructure(StructureMeta* meta) {
+    for(int i = 0; i < meta->size; i++) {
+        glm::ivec3 pos = meta->coords[i];
+        BlockType* type = meta->types[i];
+        if(type->isOpaque || blocks[pos.x][pos.y][pos.z].type == (BlockType*)AIR)
+            blocks[pos.x][pos.y][pos.z].type = meta->types[i];
+    }
+}
+
 int Chunk::sampleHeight(int x, int z, float depth) {
     static const int octaves = 20;
     int minY = 16 * depth;
@@ -158,16 +167,36 @@ int Chunk::sampleHeight(int x, int z, float depth) {
 void Chunk::initTerrain() {
     for (int x = 0; x < CHUNK_WIDTH; ++x) {
         for (int z = 0; z < CHUNK_DEPTH; ++z) {
-            int midY = sampleHeight(x, z, 0.4);
-            int maxY = sampleHeight(x, z, 1.0);
             blocks[x][0][z].type = (BlockType*) BEDROCK;
+            int midY = sampleHeight(x, z, 0.4);
             for(int y = 1; y < midY; ++y) {
                 blocks[x][y][z].type = (BlockType*) STONE;
             }
+            int maxY = sampleHeight(x, z, 1.0);
             for (int y = midY; y < maxY; ++y) {
                 blocks[x][y][z].type = (BlockType*) DIRT;
             }
             blocks[x][maxY][z].type = (BlockType*) GRASS;
+            // if(random() % 512 == 0) {
+            //     glm::ivec3 base(x, maxY + 1, z);
+            //     StructureMeta meta;
+            //     Tree::generate(&meta, base);
+            //     buildStructure(&meta);
+            // }
+        }
+    }
+}
+
+void Chunk::initTrees() {
+    for (int x = 2; x < CHUNK_WIDTH - 2; ++x) {
+        for (int z = 2; z < CHUNK_DEPTH - 2; ++z) {
+            if(perlin.normalizedOctave2D(x, z, 80) > 0.3) {
+                int y = sampleHeight(x, z, 1.0) + 1;
+                glm::ivec3 base(x, y, z);
+                StructureMeta meta;
+                Tree::generate(&meta, base);
+                buildStructure(&meta);
+            }
         }
     }
 }
@@ -175,6 +204,7 @@ void Chunk::initTerrain() {
 
 Chunk::Chunk(glm::ivec3 pos, const std::unordered_map<glm::ivec3, Chunk*>& m) : coordinates(pos), chunkMap(m) {
     initTerrain();
+    initTrees();
 }
 
 Chunk::Chunk(int x, int y, int z, const std::unordered_map<glm::ivec3, Chunk*>& m) : Chunk(glm::ivec3(x, y, z), m) {}
@@ -206,8 +236,8 @@ void Chunk::clear() {
 
 std::vector<std::pair<glm::ivec3, Chunk*>> Chunk::getNeighbors() {
     std::vector<std::pair<glm::ivec3, Chunk*>> neighbors;
-    const int const xOff[] = { CHUNK_WIDTH, -CHUNK_WIDTH };
-    const int const zOff[] = {CHUNK_DEPTH, -CHUNK_DEPTH};
+    const int xOff[] = { CHUNK_WIDTH, -CHUNK_WIDTH };
+    const int zOff[] = {CHUNK_DEPTH, -CHUNK_DEPTH};
     for (int i = 0; i < 2; ++i) {
         for (int j = 0; j < 2; ++j) {
             glm::ivec3 newVec = coordinates + glm::ivec3(xOff[i], 0, zOff[j]);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "blocks/block.hpp"
+#include "structures/structure.hpp"
 #include "utils/perlin_noise.hpp"
 
 #include <map>
@@ -12,10 +13,10 @@
 
 #include <vulkan/vulkan.h>
 
-const int CHUNK_HEIGHT = 64;
+const int CHUNK_HEIGHT = 48;
 const int CHUNK_WIDTH = 32;
 const int CHUNK_DEPTH = 32;
-const bool SHOW_CHUNK_BORDER = true;
+const bool SHOW_CHUNK_BORDER = false;
 
 
 struct BlockVertex {
@@ -61,9 +62,13 @@ class Chunk {
 	
 		void buildBlock(int x, int y, int z);
 
+		void buildStructure(StructureMeta* meta);
+
 		int sampleHeight(int x, int z, float depth);
 
 		void initTerrain();
+
+		void initTrees();
 
     public:
         static siv::PerlinNoise::seed_type seed;

@@ -96,3 +96,9 @@ glm::vec2 Bedrock::getTextureOffset(Direction dir, glm::ivec3 corner) {
 	glm::vec2 blockOffset = BlockType::purge(dir, corner);
     return (fileOffset + blockOffset) * BlockType::textureSize;
 }
+
+glm::vec2 Leaves::getTextureOffset(Direction dir, glm::ivec3 corner) {
+	glm::vec2 fileOffset(4, 8);
+	glm::vec2 blockOffset = BlockType::purge(dir, corner);
+    return (fileOffset + blockOffset) * BlockType::textureSize;
+}

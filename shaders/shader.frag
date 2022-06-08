@@ -49,7 +49,10 @@ void main() {
 	float sigma = 2.0f;		// Oren Nayar BRDF parameter
 	float gamma = 200.0f;	// Phong BRDF parameter
 	
-	vec3 DiffColor = texture(texSampler, fragTexCoord).rgb;
+	vec4 Texture = texture(texSampler, fragTexCoord);
+	if(Texture.a == 0) discard;
+
+	vec3 DiffColor = Texture.rgb;
 	
 	vec3 Diffuse = vec3(0);
 	Diffuse += Oren_Nayar_Diffuse_BRDF(lightDir0, Norm, EyeDir, DiffColor, sigma) * ubo.lightCol0;
