@@ -13,7 +13,7 @@ void Tree::generate(StructureMeta* meta, glm::ivec3 base) {
     meta->coords.clear();
     meta->types.clear();
 
-    int height = random() % dHeight + minHeight;
+    int height = rand() % dHeight + minHeight;
     for(int i = 0; i < height; i++) {
         set(meta, base + glm::ivec3(0, i, 0), (BlockType*)WOOD_LOG);
     }
