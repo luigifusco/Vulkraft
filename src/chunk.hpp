@@ -10,6 +10,7 @@
 #include <mutex>
 #include <glm/glm.hpp>
 #include <atomic>
+#include <vector>
 
 #include <vulkan/vulkan.h>
 
