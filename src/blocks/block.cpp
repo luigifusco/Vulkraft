@@ -1,20 +1,33 @@
 #include "block.hpp"
 
-glm::ivec2 BlockType::purge(Direction dir, glm::ivec3 coords) {
+#include <iostream>
+
+glm::vec2 BlockType::purge(Direction dir, glm::ivec3 coords) {
+    static const float margin = 0.003f;
+    
+    glm::ivec2 coords2D;
     switch(dir) {
         case Direction::Up: 
-            return glm::ivec2(coords.x, coords.z);
+            coords2D = glm::ivec2(coords.x, coords.z);
+            break;
         case Direction::Down: 
-            return glm::ivec2((coords.x + 1) % 2, coords.z);
+            coords2D = glm::ivec2((coords.x + 1) % 2, coords.z);
+            break;
         case Direction::North: 
-            return glm::ivec2(coords.x, (coords.y + 1) % 2);
+            coords2D = glm::ivec2(coords.x, (coords.y + 1) % 2);
+            break;
         case Direction::South:
-            return glm::ivec2((coords.x + 1) % 2, (coords.y + 1) % 2);
+            coords2D = glm::ivec2((coords.x + 1) % 2, (coords.y + 1) % 2);
+            break;
         case Direction::East: 
-            return glm::ivec2((coords.z + 1) % 2, (coords.y + 1) % 2);
+            coords2D = glm::ivec2((coords.z + 1) % 2, (coords.y + 1) % 2);
+            break;
         case Direction::West:
-            return glm::ivec2(coords.z, (coords.y + 1) % 2);
+            coords2D = glm::ivec2(coords.z, (coords.y + 1) % 2);
+            break;
     }
+
+    return (glm::vec2)coords2D * (1 - 2 * margin) + margin;
 }
 
 glm::vec2 Air::getTextureOffset(Direction dir, glm::ivec3 corner) {
@@ -100,5 +113,12 @@ glm::vec2 Bedrock::getTextureOffset(Direction dir, glm::ivec3 corner) {
 glm::vec2 Leaves::getTextureOffset(Direction dir, glm::ivec3 corner) {
 	glm::vec2 fileOffset(4, 8);
 	glm::vec2 blockOffset = BlockType::purge(dir, corner);
+    return (fileOffset + blockOffset) * BlockType::textureSize;
+}
+
+glm::vec2 Water::getTextureOffset(Direction dir, glm::ivec3 corner) {
+	glm::vec2 fileOffset(13, 12);
+	glm::vec2 blockOffset = BlockType::purge(dir, corner);
+    // std::cout<< blockOffset.x << ", "<< blockOffset.y << std::endl;
     return (fileOffset + blockOffset) * BlockType::textureSize;
 }

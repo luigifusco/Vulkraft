@@ -23,9 +23,10 @@ struct BlockVertex {
     glm::vec3 pos;
 	glm::vec3 norm;
     glm::vec2 tex;
+	int blend;
 
     static VkVertexInputBindingDescription getBindingDescription();
-    static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions();
+    static std::array<VkVertexInputAttributeDescription, 4> getAttributeDescriptions();
 };
 
 struct BlockFace {
