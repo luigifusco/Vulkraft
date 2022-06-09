@@ -3,6 +3,7 @@
 #include <glm/gtx/hash.hpp>
 #include <unordered_set>
 #include <unordered_map>
+#include <cmath>
 
 #include "AABB.hpp"
 
@@ -20,9 +21,8 @@ std::vector<glm::ivec3> Movement::getPositionsToCheck(glm::vec3 position){
 }
 
 
-Movement::CollisionResponseT Movement::canMove(const glm::vec3 & position ,const glm::vec3 & movement, const std::unordered_map<glm::ivec3, Chunk*> &chunkMap){
+Movement::CollisionResponseT Movement::canMove(const glm::vec3 & endPosition, const std::unordered_map<glm::ivec3, Chunk*> &chunkMap){
     PlayerAABB playerBox;    
-    glm::vec3 endPosition = position + movement;
     std::vector<glm::ivec3> positionsToCheck = Movement::getPositionsToCheck(endPosition);
     std::unordered_map<glm::vec3 , glm::ivec3> chunkToCheck;
     Movement::CollisionResponseT response;
@@ -44,15 +44,9 @@ Movement::CollisionResponseT Movement::canMove(const glm::vec3 & position ,const
         if(chunk->isBlockVisible(pos)){
             BlockAABB block{pos};
 
-            if(playerBox.intersect(block)){
+            if(playerBox.intersect(block)){;
 
-                PlayerAABB playerBoxInitial;
-
-                for(glm::vec3 & point: playerBoxInitial.points){
-                    point += position;
-                }
-
-                response.position = block.getDistanceTo(playerBoxInitial);
+                response.position = playerBox.getPopOut(block);
                 response.collided = true;
                 return response;          
 
@@ -61,7 +55,7 @@ Movement::CollisionResponseT Movement::canMove(const glm::vec3 & position ,const
     }
 
     response.collided = false;
-    response.position = movement;
+    response.position = endPosition;
 
     return response;
 ;
@@ -69,25 +63,26 @@ Movement::CollisionResponseT Movement::canMove(const glm::vec3 & position ,const
 
 
 Movement::CollisionResponseT Movement::resolveCollision(const glm::vec3& position , const glm::vec3& movement, const std::unordered_map<glm::ivec3, Chunk*> &chunkMap){
-    glm::vec3 finalMovement{0};
-    glm::vec3 direction = glm::normalize(movement);
-    glm::vec3 step;
     Movement::CollisionResponseT response;
+
+    const float MAX_LEN = 0.01f;
+    float len = glm::length(movement);
+    int nSteps = ceil(len / MAX_LEN);
+    glm::vec3 step = movement / (float)nSteps;
+    glm::vec3 finalPos(position);
+    bool collided = false;
     
-
-    for(float i = 0.05 ; i <= 1.0f ; i+=0.05){
-        step = movement * i;
-        auto collisionResponse = Movement::canMove(position , step, chunkMap);
-        if(collisionResponse.collided){
-            finalMovement = collisionResponse.position* movement;
-            response.collided = true;
-            response.position = finalMovement;
-            return response;
+    for (int i = 0; i < nSteps; ++i) {
+        finalPos += step;
+        auto collisionResponse = Movement::canMove(finalPos, chunkMap);
+        if (collisionResponse.collided) {
+            collided = true;
+            finalPos += collisionResponse.position;
+            collisionResponse = Movement::canMove(finalPos, chunkMap);
         }
-        finalMovement = step;
-
     }
-    response.collided = false;
-    response.position = finalMovement;
+
+    response.collided = collided;
+    response.position = finalPos;
     return response;
 }

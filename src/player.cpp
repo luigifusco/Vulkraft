@@ -22,7 +22,7 @@ void Player::update(float deltaT){
         gravityVector += glm::vec3(0,-1,0) * gravityFactor * deltaT;
 
         auto collisionResponse = Movement::resolveCollision(currentPosition , gravityVector,  chunkMap);
-        finalMovement = collisionResponse.position;
+        currentPosition = collisionResponse.position;
 
         if(collisionResponse.collided){
             gravityVector = glm::vec3(0);
@@ -41,22 +41,22 @@ void Player::update(float deltaT){
 
 
     if(collision){
-        static const std::vector<glm::vec3> axes = {glm::vec3(1,0,0),glm::vec3(0,1,0),glm::vec3(0,0,1)};
+        static const std::vector<glm::vec3> axes = {glm::vec3(1,0,0),glm::vec3(0,0,1)};
 
         movement = glm::vec3(glm::rotate(glm::mat4(1.0f), currentAngle.y, glm::vec3(0.0f, 1.0f, 0.0f)) * glm::vec4(movement.x, movement.y, movement.z, 1));
 
-        for(const auto & axis : axes){
-            glm::vec3 movementInAxis = movement * axis;
-            auto collisionResponse = Movement::resolveCollision(currentPosition, movementInAxis, chunkMap);
-            finalMovement += collisionResponse.position;
+        for (auto& a : axes) {
+            auto splitMov = movement * a;
+            auto collisionResponse = Movement::resolveCollision(currentPosition, splitMov, chunkMap);
+            currentPosition = collisionResponse.position;
         }
-
+        camera.setPosition(currentPosition);
     } else {
         finalMovement = glm::vec3(glm::rotate(glm::mat4(1.0f), currentAngle.y, glm::vec3(0.0f, 1.0f, 0.0f)) * glm::vec4(movement.x, movement.y, movement.z, 1));;
+        camera.updatePosition(finalMovement);
     }
 
 
-    camera.updatePosition(finalMovement);
 
 }
 

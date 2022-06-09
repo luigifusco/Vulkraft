@@ -29,6 +29,8 @@ struct AABB {
         float getMaxY() {return getMaxAt(1);};
         float getMaxZ() {return getMaxAt(2);};
 
+        glm::vec3 getPopOut(AABB& aabb);
+
         glm::vec3 getDistanceTo(AABB aabb);
 
 };

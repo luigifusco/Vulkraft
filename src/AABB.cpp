@@ -77,9 +77,31 @@ float AABB::getMaxAt(int index){
 
 
 bool AABB::intersect(AABB &aabb){
-  return (getMinX() <= aabb.getMaxX() && getMaxX() >= aabb.getMinX()) &&
-         (getMinY() <= aabb.getMaxY() && getMaxY() >= aabb.getMinY()) &&
-         (getMinZ() <= aabb.getMaxZ() && getMaxZ() >= aabb.getMinZ());
+  return (getMinX() < aabb.getMaxX() && getMaxX() > aabb.getMinX()) &&
+         (getMinY() < aabb.getMaxY() && getMaxY() > aabb.getMinY()) &&
+         (getMinZ() < aabb.getMaxZ() && getMaxZ() > aabb.getMinZ());
+}
+
+glm::vec3 AABB::getPopOut(AABB& aabb) {
+    const float OFF = 0.0000001f;
+    glm::vec3 mv(aabb.getMinX() - getMaxX() - OFF, 0, 0);
+    if (abs(getMinX() - aabb.getMaxX()) < glm::length(mv)) {
+        mv = glm::vec3(aabb.getMaxX() - getMinX() + OFF, 0, 0);
+    }
+    if (abs(aabb.getMinY() - getMaxY()) < glm::length(mv)) {
+        mv = glm::vec3(0, aabb.getMinY() - getMaxY() - OFF, 0);
+    }
+    if (abs(getMinY() - aabb.getMaxY()) < glm::length(mv)) {
+        mv = glm::vec3(0, aabb.getMaxY() - getMinY() + OFF, 0);
+    }
+    if (abs(aabb.getMinZ() - getMaxZ()) < glm::length(mv)) {
+        mv = glm::vec3(0, 0, aabb.getMinZ() - getMaxZ() - OFF);
+    }
+    if (abs(getMinZ() - aabb.getMaxZ()) < glm::length(mv)) {
+        mv = glm::vec3(0, 0, aabb.getMaxZ() - getMinZ() + OFF);
+    }
+
+    return mv;
 }
 
 glm::vec3 AABB::getDistanceTo(AABB aabb){
