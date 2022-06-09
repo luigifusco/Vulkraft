@@ -71,8 +71,8 @@ std::array<VkVertexInputAttributeDescription, 4> BlockVertex::getAttributeDescri
 
         attributeDescriptions[3].binding = 0;
         attributeDescriptions[3].location = 3;
-        attributeDescriptions[3].format = VK_FORMAT_R32_SINT;
-        attributeDescriptions[3].offset = offsetof(BlockVertex, blend);
+        attributeDescriptions[3].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[3].offset = offsetof(BlockVertex, mat);
 
         return attributeDescriptions;
     }
@@ -134,12 +134,12 @@ void Chunk::buildBlockFace(int x, int y, int z, Direction dir) {
     BlockFace face = block.faces[dir];
     glm::ivec3 pos = coordinates + glm::ivec3(x, y, z);
     int index = vertices.size();
-    int blend = block.type->shouldBlend();
+    glm::vec3 mat = block.type->getMaterialSettings();
 
-    vertices.push_back({pos + face.a, face.norm, block.type->getTextureOffset(dir, face.a), blend});
-    vertices.push_back({pos + face.b, face.norm, block.type->getTextureOffset(dir, face.b), blend});
-    vertices.push_back({pos + face.c, face.norm, block.type->getTextureOffset(dir, face.c), blend});
-    vertices.push_back({pos + face.d, face.norm, block.type->getTextureOffset(dir, face.d), blend});
+    vertices.push_back({pos + face.a, face.norm, block.type->getTextureOffset(dir, face.a), mat});
+    vertices.push_back({pos + face.b, face.norm, block.type->getTextureOffset(dir, face.b), mat});
+    vertices.push_back({pos + face.c, face.norm, block.type->getTextureOffset(dir, face.c), mat});
+    vertices.push_back({pos + face.d, face.norm, block.type->getTextureOffset(dir, face.d), mat});
 
     indices.push_back(index + 0);
     indices.push_back(index + 1);
