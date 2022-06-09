@@ -58,11 +58,11 @@ class Chunk {
         std::vector<uint32_t> indices;
 		const std::unordered_map<glm::ivec3, Chunk*>& chunkMap;
 
-		std::vector<Direction> getVisibleFaces(int x, int y, int z);
+		std::vector<Direction> getVisibleFaces(int x, int y, int z, bool opaqueOnly);
 
 		void buildBlockFace(int x, int y, int z, Direction dir);
 	
-		void buildBlock(int x, int y, int z);
+		void buildBlock(int x, int y, int z, bool opaqueOnly);
 
 		void buildStructure(StructureMeta* meta);
 

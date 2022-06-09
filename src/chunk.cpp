@@ -81,8 +81,9 @@ bool shouldSeeFace(Block self, Block other) {
     return !other.type->isOpaque && (!self.type->shouldBlend() || self.type != other.type);
 }
 
-std::vector<Direction> Chunk::getVisibleFaces(int x, int y, int z) {
+std::vector<Direction> Chunk::getVisibleFaces(int x, int y, int z, bool opaqueOnly) {
     Block block = blocks[x][y][z];
+
     std::vector<Direction> faces;
 
     if(SHOW_CHUNK_BORDER) {
@@ -95,6 +96,8 @@ std::vector<Direction> Chunk::getVisibleFaces(int x, int y, int z) {
     }
 
     if(!block.type->isVisible()) return faces;
+    if (opaqueOnly && block.type->shouldBlend()) return faces;
+    if (!opaqueOnly && !block.type->shouldBlend()) return faces;
     if (x == 0) {
         glm::ivec3 wIndex(coordinates.x - CHUNK_WIDTH, coordinates.y, coordinates.z);
         auto iter = chunkMap.find(wIndex);
@@ -146,8 +149,8 @@ void Chunk::buildBlockFace(int x, int y, int z, Direction dir) {
     indices.push_back(index + 3);
 }
 
-void Chunk::buildBlock(int x, int y, int z) {
-    std::vector<Direction> visibleFaces = getVisibleFaces(x, y, z);
+void Chunk::buildBlock(int x, int y, int z, bool opaqueOnly) {
+    std::vector<Direction> visibleFaces = getVisibleFaces(x, y, z, opaqueOnly);
     for(const Direction &dir : visibleFaces) {
         buildBlockFace(x, y, z, dir);
     }
@@ -238,7 +241,14 @@ void Chunk::build() {
     for (int x = 0; x < CHUNK_WIDTH; ++x) {
         for (int y = 0; y < CHUNK_HEIGHT; ++y) {
             for (int z = 0; z < CHUNK_DEPTH; ++z) {
-                buildBlock(x, y, z);
+                buildBlock(x, y, z, true);
+            }
+        }
+    }
+    for (int x = 0; x < CHUNK_WIDTH; ++x) {
+        for (int y = 0; y < CHUNK_HEIGHT; ++y) {
+            for (int z = 0; z < CHUNK_DEPTH; ++z) {
+                buildBlock(x, y, z, false);
             }
         }
     }
