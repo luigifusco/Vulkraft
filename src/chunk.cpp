@@ -21,6 +21,8 @@
 #include "utils/perlin_noise.hpp"
 #include "chunk.hpp"
 
+const int MAX_FRAMES_IN_FLIGHT = 2;
+
 siv::PerlinNoise::seed_type Chunk::seed = 0;
 siv::PerlinNoise Chunk::perlin{ 0 };
 
@@ -217,12 +219,48 @@ void Chunk::initTrees() {
 }
 
 
-Chunk::Chunk(glm::ivec3 pos, const std::unordered_map<glm::ivec3, Chunk*>& m) : coordinates(pos), chunkMap(m) {
+Chunk::Chunk(glm::ivec3 pos, const std::unordered_map<glm::ivec3, Chunk*>& m) : coordinates(pos), chunkMap(m), curBuffer(0), needsRedrawing(false) {
     initTerrain();
     initTrees();
+    vertexBuffer.resize(MAX_FRAMES_IN_FLIGHT, nullptr);
+    vertexBufferMemory.resize(MAX_FRAMES_IN_FLIGHT, nullptr);
+    indexBuffer.resize(MAX_FRAMES_IN_FLIGHT, nullptr);
+    indexBufferMemory.resize(MAX_FRAMES_IN_FLIGHT, nullptr);
 }
 
 Chunk::Chunk(int x, int y, int z, const std::unordered_map<glm::ivec3, Chunk*>& m) : Chunk(glm::ivec3(x, y, z), m) {}
+
+void Chunk::initRedraw() {
+    curBuffer = (curBuffer + 1) % MAX_FRAMES_IN_FLIGHT;
+}
+
+void Chunk::setViewData(VkBuffer vB, VkDeviceMemory vBM, VkBuffer iB, VkDeviceMemory iBM) {
+    vertexBuffer[curBuffer] = vB;
+    vertexBufferMemory[curBuffer] = vBM;
+    indexBuffer[curBuffer] = iB;
+    indexBufferMemory[curBuffer] = iBM;
+}
+
+
+uint32_t Chunk::getIndicesSize() {
+    return indices.size();
+}
+
+VkBuffer Chunk::getVertexBuffer() {
+    return vertexBuffer[curBuffer];
+}
+
+VkBuffer Chunk::getIndexBuffer() {
+    return indexBuffer[curBuffer];
+}
+
+VkDeviceMemory Chunk::getVertexBufferMemory() {
+    return vertexBufferMemory[curBuffer];
+}
+
+VkDeviceMemory Chunk::getIndexBufferMemory() {
+    return indexBufferMemory[curBuffer];
+}
 
 std::vector<BlockVertex> Chunk::getVertices() {
     return vertices;
@@ -242,6 +280,7 @@ void Chunk::build() {
             }
         }
     }
+    needsRedrawing = true;
 }
 
 void Chunk::clear() {

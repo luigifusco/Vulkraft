@@ -14,9 +14,9 @@
 
 #include <vulkan/vulkan.h>
 
-const int CHUNK_HEIGHT = 48;
-const int CHUNK_WIDTH = 32;
-const int CHUNK_DEPTH = 32;
+const int CHUNK_HEIGHT = 64;
+const int CHUNK_WIDTH = 64;
+const int CHUNK_DEPTH = 64;
 const bool SHOW_CHUNK_BORDER = false;
 
 
@@ -57,6 +57,15 @@ class Chunk {
         std::vector<BlockVertex> vertices;
         std::vector<uint32_t> indices;
 		const std::unordered_map<glm::ivec3, Chunk*>& chunkMap;
+		std::vector<VkBuffer> vertexBuffer;
+		std::vector<VkDeviceMemory> vertexBufferMemory;
+		std::vector<VkBuffer> indexBuffer;
+		std::vector<VkDeviceMemory> indexBufferMemory;
+		std::vector<bool> bufferInitialized;
+		int curBuffer;
+
+        static siv::PerlinNoise::seed_type seed;
+        static siv::PerlinNoise perlin;
 
 		std::vector<Direction> getVisibleFaces(int x, int y, int z);
 
@@ -73,8 +82,6 @@ class Chunk {
 		void initTrees();
 
     public:
-        static siv::PerlinNoise::seed_type seed;
-        static siv::PerlinNoise perlin;
         Chunk(int x, int y, int z, const std::unordered_map<glm::ivec3, Chunk*>& m);
 
 		Chunk(glm::ivec3 pos, const std::unordered_map<glm::ivec3, Chunk*>& m);
@@ -94,6 +101,22 @@ class Chunk {
 		std::vector<std::pair<glm::ivec3, Chunk*>> getNeighbors();
 
 		static void setSeed(unsigned int seedIn);
+
+		void initRedraw();
+
+		VkBuffer getVertexBuffer();
+
+		VkBuffer getIndexBuffer();
+
+		VkDeviceMemory getVertexBufferMemory();
+
+		VkDeviceMemory getIndexBufferMemory();
+
+		bool needsRedrawing;
+
+		uint32_t getIndicesSize();
+
+		void setViewData(VkBuffer vB, VkDeviceMemory vBM, VkBuffer iB, VkDeviceMemory iBM);
 };
 
 void chunkGeneratorFunction(

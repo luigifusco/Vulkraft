@@ -160,13 +160,11 @@ private:
     VkImageView textureImageView;
     VkSampler textureSampler;
 
-    std::vector<BlockVertex> vertices;
-    std::vector<uint32_t> indices;
     std::vector<VkBuffer> vertexBuffer;
     std::vector<VkDeviceMemory> vertexBufferMemory;
     std::vector<VkBuffer> indexBuffer;
     std::vector<VkDeviceMemory> indexBufferMemory;
-    int curBuffer = 0;
+    std::vector<uint32_t> indicesSizes;
 
     std::vector<VkBuffer> vertexUniformBuffers;
     std::vector<VkDeviceMemory> vertexUniformBuffersMemory;
@@ -240,8 +238,6 @@ private:
         createTextureSampler();
         initializeChunks();
         drawVisibleChunks();
-        createVertexBuffer();
-        createIndexBuffer();
         createUniformBuffers();
         createDescriptorPool();
         createDescriptorSets();
@@ -285,6 +281,22 @@ private:
         isThreadStopped = true;
         inC.notify_one();
         chunkThread.join();
+        for (auto& chunk : chunkMap) {
+            for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
+                VkBuffer vB = chunk.second->getVertexBuffer();
+                VkBuffer iB = chunk.second->getIndexBuffer();
+                VkDeviceMemory vBM = chunk.second->getVertexBufferMemory();
+                VkDeviceMemory iBM = chunk.second->getIndexBufferMemory();
+                if (vB != nullptr) {
+                    vkDestroyBuffer(device, vB, nullptr);
+                    vkFreeMemory(device, vBM, nullptr);
+                    vkDestroyBuffer(device, iB, nullptr);
+                    vkFreeMemory(device, iBM, nullptr);
+                }
+            }
+            delete chunk.second;
+        }
+        chunkMap.clear();
 
         vkDeviceWaitIdle(device);
     }
@@ -322,16 +334,29 @@ private:
 		
 
         if (glfwGetKey(window, GLFW_KEY_R)) {
-            vertices.clear();
-            indices.clear();
             isThreadStopped = true;
             inC.notify_one();
             chunkThread.join();
             for (auto& chunk : chunkMap) {
+                for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
+                    VkBuffer vB = chunk.second->getVertexBuffer();
+                    VkBuffer iB = chunk.second->getIndexBuffer();
+                    VkDeviceMemory vBM = chunk.second->getVertexBufferMemory();
+                    VkDeviceMemory iBM = chunk.second->getIndexBufferMemory();
+                    if (vB != nullptr) {
+                        vkDestroyBuffer(device, vB, nullptr);
+                        vkFreeMemory(device, vBM, nullptr);
+                        vkDestroyBuffer(device, iB, nullptr);
+                        vkFreeMemory(device, iBM, nullptr);
+                    }
+                }
                 delete chunk.second;
             }
             chunkMap.clear();
             Chunk::setSeed(rand());
+            vertexBuffer.clear();
+            indexBuffer.clear();
+            indicesSizes.clear();
             isThreadStopped = false;
             chunkThread = std::thread(
                 chunkGeneratorFunction,
@@ -348,8 +373,9 @@ private:
 
         static std::unordered_set<glm::ivec3> chunkIndexesToAdd;
         glm::ivec3 baseChunkIndex = Chunk::findChunkIndex(player.getCamera().getPosition(), chunkMap);
-        for (int i = -2; i <= 2; ++i) {
-            for (int j = -2; j <= 2; ++j) {
+        const int CHUNK_RANGE = 1;
+        for (int i = -CHUNK_RANGE; i <= CHUNK_RANGE; ++i) {
+            for (int j = -CHUNK_RANGE; j <= CHUNK_RANGE; ++j) {
                 glm::ivec3 curChunkIndex(baseChunkIndex.x + i * CHUNK_WIDTH, baseChunkIndex.y, baseChunkIndex.z + j * CHUNK_DEPTH);
                 if (chunkMap.find(curChunkIndex) == chunkMap.end()) {
                     if (chunkIndexesToAdd.find(curChunkIndex) == chunkIndexesToAdd.end()) {
@@ -391,11 +417,6 @@ private:
             if (shouldRedraw) {
                 drawVisibleChunks();
             }
-            if (vertices.size()) {
-                curBuffer = (curBuffer + 1) % MAX_FRAMES_IN_FLIGHT;
-                updateVertexBuffer();
-                updateIndexBuffer();
-            }
         }
 
         sunDir = (glm::rotate(glm::mat4(1.0f), SUN_SPEED, glm::vec3(1, 0, 0)) * glm::vec4(sunDir, 1.0f));
@@ -436,17 +457,6 @@ private:
         vkUnmapMemory(device, fragmentUniformBuffersMemory[currentImage]);
 	}
 
-    void drawChunk(Chunk* newChunk) {
-        std::vector<BlockVertex> curVertices = newChunk->getVertices();
-        std::vector<uint32_t> curIndices = newChunk->getIndices();
-
-        indices.reserve(indices.size() + curIndices.size());
-        for (int i = 0; i < curIndices.size(); ++i) {
-            indices.push_back(curIndices[i] + vertices.size());
-        }
-        vertices.insert(vertices.end(), curVertices.begin(), curVertices.end());
-    }
-
     void initializeChunks() {
         Chunk::setSeed(rand());
         chunkMap.insert(std::pair(glm::ivec3(0, 0, 0), new Chunk(0, 0, 0, chunkMap)));
@@ -456,8 +466,6 @@ private:
     }
 
     void drawVisibleChunks() {
-        vertices.clear();
-        indices.clear();
         std::vector<Chunk*> visibleChunks;
         const int VIEW_RANGE = 2;
         {
@@ -473,8 +481,17 @@ private:
                 }
             }
         }
+        vertexBuffer.clear();
+        indexBuffer.clear();
+        indicesSizes.clear();
         for (auto& iter : visibleChunks) {
-            drawChunk(iter);
+            if (iter->needsRedrawing) {
+                redrawChunk(iter);
+                iter->needsRedrawing = false;
+            }
+            vertexBuffer.push_back(iter->getVertexBuffer());
+            indexBuffer.push_back(iter->getIndexBuffer());
+            indicesSizes.push_back(iter->getIndicesSize());
         }
     }
 
@@ -522,13 +539,13 @@ private:
 
         vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 
-        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
+        /*for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
             vkDestroyBuffer(device, indexBuffer[i], nullptr);
             vkFreeMemory(device, indexBufferMemory[i], nullptr);
 
             vkDestroyBuffer(device, vertexBuffer[i], nullptr);
             vkFreeMemory(device, vertexBufferMemory[i], nullptr);
-        }
+        }*/
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
@@ -1375,127 +1392,58 @@ private:
         endSingleTimeCommands(commandBuffer);
     }
 
-    /*void loadModel() {
-        tinyobj::attrib_t attrib;
-        std::vector<tinyobj::shape_t> shapes;
-        std::vector<tinyobj::material_t> materials;
-        std::string warn, err;
-        if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, MODEL_PATH.c_str())) {
-            throw std::runtime_error(warn + err);
-        }
-        std::unordered_map<Vertex, uint32_t> uniqueVertices{};
-        for (const auto& shape : shapes) {
-            for (const auto& index : shape.mesh.indices) {
-                Vertex vertex{};
-                vertex.pos = {
-                    attrib.vertices[3 * index.vertex_index + 0],
-                    attrib.vertices[3 * index.vertex_index + 1],
-                    attrib.vertices[3 * index.vertex_index + 2]
-                };
-                vertex.texCoord = {
-                    attrib.texcoords[2 * index.texcoord_index + 0],
-                    1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
-                };
-                vertex.color = {1.0f, 1.0f, 1.0f};
-                if (uniqueVertices.count(vertex) == 0) {
-                    uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
-                    vertices.push_back(vertex);
-                }
-                indices.push_back(uniqueVertices[vertex]);
-            }
-        }
-    }*/
+    void redrawChunk(Chunk* chunk) {
+        chunk->initRedraw();
+        std::vector<BlockVertex> v = chunk->getVertices();
+        std::vector<uint32_t> i = chunk->getIndices();
+        VkBuffer vB = chunk->getVertexBuffer();
+        VkBuffer iB = chunk->getIndexBuffer();
+        VkDeviceMemory vBM = chunk->getVertexBufferMemory();
+        VkDeviceMemory iBM = chunk->getIndexBufferMemory();
 
-    void createVertexBuffer() {
-        VkDeviceSize bufferSize = sizeof(BlockVertex) * vertices.size();
-
-        vertexBuffer.resize(MAX_FRAMES_IN_FLIGHT);
-        vertexBufferMemory.resize(MAX_FRAMES_IN_FLIGHT);
-
-        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
-            VkBuffer stagingBuffer;
-            VkDeviceMemory stagingBufferMemory;
-            createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-            void* data;
-            vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-                memcpy(data, vertices.data(), (size_t) bufferSize);
-            vkUnmapMemory(device, stagingBufferMemory);
-
-            createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer[i], vertexBufferMemory[i]);
-
-            copyBuffer(stagingBuffer, vertexBuffer[i], bufferSize);
-
-            vkDestroyBuffer(device, stagingBuffer, nullptr);
-            vkFreeMemory(device, stagingBufferMemory, nullptr);
-        }
-    }
-
-    void updateVertexBuffer() {
-        VkDeviceSize bufferSize = sizeof(BlockVertex) * vertices.size();
+        VkDeviceSize bufferSize = sizeof(BlockVertex) * v.size();
 
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingBufferMemory;
         createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
         void* data;
         vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-        memcpy(data, vertices.data(), (size_t)bufferSize);
+        memcpy(data, v.data(), (size_t)bufferSize);
         vkUnmapMemory(device, stagingBufferMemory);
 
-        vkDestroyBuffer(device, vertexBuffer[curBuffer], nullptr);
-        vkFreeMemory(device, vertexBufferMemory[curBuffer], nullptr);
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer[curBuffer], vertexBufferMemory[curBuffer]);
-        
-        copyBuffer(stagingBuffer, vertexBuffer[curBuffer], bufferSize);
+        if (vB != nullptr) {
+            vkDestroyBuffer(device, vB, nullptr);
+            vkFreeMemory(device, vBM, nullptr);
+        }
+        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vB, vBM);
+
+        copyBuffer(stagingBuffer, vB, bufferSize);
 
         vkDestroyBuffer(device, stagingBuffer, nullptr);
         vkFreeMemory(device, stagingBufferMemory, nullptr);
-    }
 
-    void createIndexBuffer() {
-        VkDeviceSize bufferSize = sizeof(uint32_t) * indices.size();
 
-        indexBuffer.resize(MAX_FRAMES_IN_FLIGHT);
-        indexBufferMemory.resize(MAX_FRAMES_IN_FLIGHT);
 
-        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
-            VkBuffer stagingBuffer;
-            VkDeviceMemory stagingBufferMemory;
-            createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+        bufferSize = sizeof(uint32_t) * i.size();
 
-            void* data;
-            vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-                memcpy(data, indices.data(), (size_t) bufferSize);
-            vkUnmapMemory(device, stagingBufferMemory);
-
-            createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer[i], indexBufferMemory[i]);
-
-            copyBuffer(stagingBuffer, indexBuffer[i], bufferSize);
-
-            vkDestroyBuffer(device, stagingBuffer, nullptr);
-            vkFreeMemory(device, stagingBufferMemory, nullptr);
-        }
-    }
-
-    void updateIndexBuffer() {
-        VkDeviceSize bufferSize = sizeof(uint32_t) * indices.size();
-
-        VkBuffer stagingBuffer;
-        VkDeviceMemory stagingBufferMemory;
         createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
-        void* data;
         vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-        memcpy(data, indices.data(), (size_t)bufferSize);
+        memcpy(data, i.data(), (size_t)bufferSize);
         vkUnmapMemory(device, stagingBufferMemory);
 
-        vkDestroyBuffer(device, indexBuffer[curBuffer], nullptr);
-        vkFreeMemory(device, indexBufferMemory[curBuffer], nullptr);
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer[curBuffer], indexBufferMemory[curBuffer]);
+        if (iB != nullptr) {
+            vkDestroyBuffer(device, iB, nullptr);
+            vkFreeMemory(device, iBM, nullptr);
+        }
+        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, iB, iBM);
 
-        copyBuffer(stagingBuffer, indexBuffer[curBuffer], bufferSize);
+        copyBuffer(stagingBuffer, iB, bufferSize);
 
         vkDestroyBuffer(device, stagingBuffer, nullptr);
         vkFreeMemory(device, stagingBufferMemory, nullptr);
+
+        chunk->setViewData(vB, vBM, iB, iBM);
     }
 
     void createUniformBuffers() {
@@ -1717,19 +1665,21 @@ private:
         renderPassInfo.pClearValues = clearValues.data();
 
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+        for (int i = 0; i < vertexBuffer.size(); ++i) {
+            if (vertexBuffer[i] == VK_NULL_HANDLE) continue;
 
-            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-
-            VkBuffer vertexBuffers[] = {vertexBuffer[curBuffer]};
+            VkBuffer vertexBuffers[] = {vertexBuffer[i]};
             VkDeviceSize offsets[] = {0};
             vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
-            vkCmdBindIndexBuffer(commandBuffer, indexBuffer[curBuffer], 0, VK_INDEX_TYPE_UINT32);
+            vkCmdBindIndexBuffer(commandBuffer, indexBuffer[i], 0, VK_INDEX_TYPE_UINT32);
 
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
 
-            vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+            vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indicesSizes[i]), 1, 0, 0, 0);
 
+        }
         vkCmdEndRenderPass(commandBuffer);
 
         if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
