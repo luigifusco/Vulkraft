@@ -20,11 +20,12 @@ std::vector<glm::ivec3> Movement::getPositionsToCheck(glm::vec3 position){
 }
 
 
-bool Movement::canMove(const glm::vec3 & position ,const glm::vec3 & direction, const std::unordered_map<glm::ivec3, Chunk*> &chunkMap){
+Movement::CollisionResponseT Movement::canMove(const glm::vec3 & position ,const glm::vec3 & movement, const std::unordered_map<glm::ivec3, Chunk*> &chunkMap){
     PlayerAABB playerBox;    
-    glm::vec3 endPosition = position + direction;
+    glm::vec3 endPosition = position + movement;
     std::vector<glm::ivec3> positionsToCheck = Movement::getPositionsToCheck(endPosition);
     std::unordered_map<glm::vec3 , glm::ivec3> chunkToCheck;
+    Movement::CollisionResponseT response;
 
 
 
@@ -44,29 +45,49 @@ bool Movement::canMove(const glm::vec3 & position ,const glm::vec3 & direction, 
             BlockAABB block{pos};
 
             if(playerBox.intersect(block)){
-                return false;
+
+                PlayerAABB playerBoxInitial;
+
+                for(glm::vec3 & point: playerBoxInitial.points){
+                    point += position;
+                }
+
+                response.position = block.getDistanceTo(playerBoxInitial);
+                response.collided = true;
+                return response;          
+
             }
         }
     }
 
-    return true;
+    response.collided = false;
+    response.position = movement;
+
+    return response;
+;
 }
 
 
-glm::vec3 Movement::resolveCollision(const glm::vec3& position , const glm::vec3& movement , const std::unordered_map<glm::ivec3, Chunk*> &chunkMap ){
+Movement::CollisionResponseT Movement::resolveCollision(const glm::vec3& position , const glm::vec3& movement, const std::unordered_map<glm::ivec3, Chunk*> &chunkMap){
     glm::vec3 finalMovement{0};
+    glm::vec3 direction = glm::normalize(movement);
     glm::vec3 step;
+    Movement::CollisionResponseT response;
     
 
-    for(float i = 0.1 ; i <= 1.0f ; i+=0.1){
+    for(float i = 0.05 ; i <= 1.0f ; i+=0.05){
         step = movement * i;
-
-        if(!Movement::canMove(position , step, chunkMap)){
-            break;
+        auto collisionResponse = Movement::canMove(position , step, chunkMap);
+        if(collisionResponse.collided){
+            finalMovement = collisionResponse.position* movement;
+            response.collided = true;
+            response.position = finalMovement;
+            return response;
         }
         finalMovement = step;
 
     }
-
-    return finalMovement;
+    response.collided = false;
+    response.position = finalMovement;
+    return response;
 }
