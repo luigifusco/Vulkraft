@@ -36,15 +36,15 @@ AABB::AABB(glm::vec3 position , float width , float height , float depth) {
 }
 
 PlayerAABB::PlayerAABB(): AABB({
-     glm::vec3(0.3, 0.3, 0.3),
-     glm::vec3(0.3, 0.3, -0.3),
-     glm::vec3(-0.3, 0.3, 0.3),
-     glm::vec3(-0.3, 0.3, -0.3),
-     glm::vec3(0.3, -1.5, 0.3),
-     glm::vec3(0.3, -1.5, -0.3),
-     glm::vec3(-0.3, -1.5, 0.3),
-     glm::vec3(-0.3, -1.5, -0.3),
-  } , 0.3 , 1.8, 0.3){}
+     glm::vec3(0.4, 0.3, 0.4),
+     glm::vec3(0.4, 0.3, -0.4),
+     glm::vec3(-0.4, 0.3, 0.4),
+     glm::vec3(-0.4, 0.3, -0.4),
+     glm::vec3(0.4, -1.5, 0.4),
+     glm::vec3(0.4, -1.5, -0.4),
+     glm::vec3(-0.4, -1.5, 0.4),
+     glm::vec3(-0.4, -1.5, -0.4),
+  } , 0.4 , 1.8, 0.4){}
 
 BlockAABB::BlockAABB(glm::vec3 blockPosition) : AABB(blockPosition , 1.0) {}
 
@@ -83,7 +83,7 @@ bool AABB::intersect(AABB &aabb){
 }
 
 glm::vec3 AABB::getPopOut(AABB& aabb) {
-    const float OFF = 0.001f;
+    const float OFF = 0.0001f;
     glm::vec3 mv(aabb.getMinX() - getMaxX() - OFF, 0, 0);
     if (abs(getMinX() - aabb.getMaxX()) < glm::length(mv)) {
         mv = glm::vec3(aabb.getMaxX() - getMinX() + OFF, 0, 0);

@@ -46,11 +46,8 @@ void Player::update(float deltaT){
 
         movement = glm::vec3(glm::rotate(glm::mat4(1.0f), currentAngle.y, glm::vec3(0.0f, 1.0f, 0.0f)) * glm::vec4(movement.x, movement.y, movement.z, 1));
 
-        for (auto& a : axes) {
-            auto splitMov = movement * a;
-            auto collisionResponse = Movement::resolveCollision(currentPosition, splitMov, chunkMap);
-            currentPosition = collisionResponse.position;
-        }
+        auto collisionResponse = Movement::resolveCollision(currentPosition, movement, chunkMap);
+        currentPosition = collisionResponse.position;
         camera.setPosition(currentPosition);
     } else {
         finalMovement = glm::vec3(glm::rotate(glm::mat4(1.0f), currentAngle.y, glm::vec3(0.0f, 1.0f, 0.0f)) * glm::vec4(movement.x, movement.y, movement.z, 1));;

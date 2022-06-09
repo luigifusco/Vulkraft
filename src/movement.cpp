@@ -28,7 +28,6 @@ Movement::CollisionResponseT Movement::canMove(const glm::vec3 & endPosition, co
     Movement::CollisionResponseT response;
 
 
-
     for(glm::vec3 & point: playerBox.points){
         point += endPosition;
     }
@@ -44,28 +43,23 @@ Movement::CollisionResponseT Movement::canMove(const glm::vec3 & endPosition, co
         if(chunk->isBlockVisible(pos)){
             BlockAABB block{pos};
 
-            if(playerBox.intersect(block)){;
-
-                response.position = playerBox.getPopOut(block);
+            if(playerBox.intersect(block)){ // save only biggest compenetration
+                auto v = playerBox.getPopOut(block);
+                if (glm::length(v) > glm::length(response.position))
+                    response.position = v;
                 response.collided = true;
-                return response;          
-
             }
         }
     }
 
-    response.collided = false;
-    response.position = endPosition;
-
     return response;
-;
 }
 
 
 Movement::CollisionResponseT Movement::resolveCollision(const glm::vec3& position , const glm::vec3& movement, const std::unordered_map<glm::ivec3, Chunk*> &chunkMap){
     Movement::CollisionResponseT response;
 
-    const float MAX_LEN = 0.01f;
+    const float MAX_LEN = 0.1f;
     float len = glm::length(movement);
     int nSteps = ceil(len / MAX_LEN);
     glm::vec3 step = movement / (float)nSteps;
@@ -75,10 +69,14 @@ Movement::CollisionResponseT Movement::resolveCollision(const glm::vec3& positio
     for (int i = 0; i < nSteps; ++i) {
         finalPos += step;
         auto collisionResponse = Movement::canMove(finalPos, chunkMap);
+        int failureCheck = 0;
         while (collisionResponse.collided) {
             collided = true;
             finalPos += collisionResponse.position;
             collisionResponse = Movement::canMove(finalPos, chunkMap);
+            if (failureCheck++ == 100) {
+                finalPos.y = 50;
+            }
         }
     }
 
