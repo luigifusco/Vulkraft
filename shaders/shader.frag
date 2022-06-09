@@ -13,7 +13,7 @@ layout(binding = 2) uniform sampler2D texSampler;
 layout(location = 0) in vec3 fragNorm;
 layout(location = 1) in vec2 fragTexCoord;
 layout(location = 2) in vec3 fragPos;
-layout(location = 3) flat in int fragBlend;
+layout(location = 3) in vec3 fragMaterial;
 
 layout(location = 0) out vec4 outColor;
 
@@ -47,25 +47,22 @@ void main() {
 	vec3 lightDir0 = normalize(ubo.lightDir0);
 	vec3 lightDir1 = normalize(ubo.lightDir1);
 	
-	float sigma = 2.0f;		// Oren Nayar BRDF parameter
-	float gamma = 200.0f;	// Phong BRDF parameter
-	
 	vec4 Texture = texture(texSampler, fragTexCoord);
 	if(Texture.a == 0) discard;
 
 	vec3 DiffColor = Texture.rgb;
 	
 	vec3 Diffuse = vec3(0);
-	Diffuse += Oren_Nayar_Diffuse_BRDF(lightDir0, Norm, EyeDir, DiffColor, sigma) * ubo.lightCol0;
-	Diffuse += Oren_Nayar_Diffuse_BRDF(lightDir1, Norm, EyeDir, DiffColor, sigma) * ubo.lightCol1;
+	Diffuse += Oren_Nayar_Diffuse_BRDF(lightDir0, Norm, EyeDir, DiffColor, fragMaterial.y) * ubo.lightCol0;
+	Diffuse += Oren_Nayar_Diffuse_BRDF(lightDir1, Norm, EyeDir, DiffColor, fragMaterial.y) * ubo.lightCol1;
 	
 	vec3 Specular = vec3(0);
-	Specular += Phong_Specular_BRDF(lightDir0, Norm, EyeDir, vec3(0.05), gamma) * ubo.lightCol0;
-	Specular += Phong_Specular_BRDF(lightDir1, Norm, EyeDir, vec3(0.05), gamma) * ubo.lightCol1;
+	Specular += Phong_Specular_BRDF(lightDir0, Norm, EyeDir, vec3(0.05), fragMaterial.z) * ubo.lightCol0;
+	Specular += Phong_Specular_BRDF(lightDir1, Norm, EyeDir, vec3(0.05), fragMaterial.z) * ubo.lightCol1;
 
 	vec3 Ambient = ubo.ambFactor.x * DiffColor;
 	
-	if(fragBlend == 1) {
+	if(fragMaterial.x == 1.0f) {
 		outColor = vec4(Diffuse + Specular + Ambient, Texture.a);
 	} else {
 		outColor = vec4(Diffuse + Specular + Ambient, 1.0f);
