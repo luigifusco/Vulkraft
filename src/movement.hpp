@@ -19,6 +19,17 @@ namespace MovementDirection {
 
 namespace Movement {
 
-    bool canMove(const glm::vec3 & position , const glm::vec3 & direction, const std::unordered_map<glm::ivec3, Chunk*> &chunkMap);
+    struct CollisionResponseT {
+        bool collided;
+        glm::vec3 position;
+    };
+
+    static const float numSteps = 3.0f;
+
+    CollisionResponseT canMove(const glm::vec3 & endPosition, const std::unordered_map<glm::ivec3, Chunk*> &chunkMap );
+
+    CollisionResponseT resolveCollision(const glm::vec3& position , const glm::vec3& movement, const std::unordered_map<glm::ivec3, Chunk*> &chunkMap);
+
+    std::vector<glm::ivec3> getPositionsToCheck(glm::vec3 position);
 
 }

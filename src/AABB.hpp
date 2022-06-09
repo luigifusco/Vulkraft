@@ -7,11 +7,14 @@
 struct AABB {
     public:
         std::array<glm::vec3, 8> points;
+        float width , height , depth;
 
 
     public:
         AABB(std::array<glm::vec3, 8> points);
+        AABB(std::array<glm::vec3, 8> points , float width , float height , float depth);
         AABB(glm::vec3 position, float offset);
+        AABB(glm::vec3 position, float width , float height , float depth);
         ~AABB() = default;
         
         bool intersect(AABB & aabb);
@@ -25,6 +28,10 @@ struct AABB {
         float getMaxX() {return getMaxAt(0);};
         float getMaxY() {return getMaxAt(1);};
         float getMaxZ() {return getMaxAt(2);};
+
+        glm::vec3 getPopOut(AABB& aabb);
+
+        glm::vec3 getDistanceTo(AABB aabb);
 
 };
 

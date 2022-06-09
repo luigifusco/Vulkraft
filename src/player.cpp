@@ -4,16 +4,16 @@
 
 #include <iostream>
 
-Player::Player(Camera &_camera) : camera(_camera){}
+Player::Player(Camera &_camera , std::unordered_map<glm::ivec3, Chunk*>& _chunkMap) : camera(_camera) , chunkMap(_chunkMap){}
 
 Player::~Player(){}
 
 
-void Player::update(float deltaT, const std::unordered_map<glm::ivec3, Chunk*> &chunkMap ){
+void Player::update(float deltaT){
     glm::vec3 currentPosition = camera.getPosition();
     glm::vec3 currentAngle = camera.getAngle();
     glm::vec3 movement(0);
-    glm::vec3 newDirection(0);
+    glm::vec3 finalMovement(0);
     
     
     if(movements.empty() && (gravity == false)) return;
@@ -21,10 +21,10 @@ void Player::update(float deltaT, const std::unordered_map<glm::ivec3, Chunk*> &
     if(gravity){
         gravityVector += glm::vec3(0,-1,0) * gravityFactor * deltaT;
 
-        if(Movement::canMove(currentPosition, gravityVector, chunkMap)){
-            newDirection += gravityVector;
-        }
-        else{
+        auto collisionResponse = Movement::resolveCollision(currentPosition , gravityVector,  chunkMap);
+        currentPosition = collisionResponse.position;
+
+        if(collisionResponse.collided){
             gravityVector = glm::vec3(0);
             canJump = true;
         }
@@ -41,31 +41,35 @@ void Player::update(float deltaT, const std::unordered_map<glm::ivec3, Chunk*> &
 
 
     if(collision){
-        std::vector<glm::vec3> axes = {glm::vec3(1,0,0),glm::vec3(0,1,0),glm::vec3(0,0,1)};
+        static const std::vector<glm::vec3> axes = {glm::vec3(1,0,0),glm::vec3(0,0,1)};
 
         movement = glm::vec3(glm::rotate(glm::mat4(1.0f), currentAngle.y, glm::vec3(0.0f, 1.0f, 0.0f)) * glm::vec4(movement.x, movement.y, movement.z, 1));
-        for(const auto & axis : axes){
-            glm::vec3 movementInAxis = movement * axis;
-            //correct direction relative to cam angle
-            if(Movement::canMove(camera.getPosition(), movementInAxis, chunkMap)){
-                newDirection += movementInAxis;
-            }
-        }
 
+        for (auto& a : axes) {
+            auto splitMov = movement * a;
+            auto collisionResponse = Movement::resolveCollision(currentPosition, splitMov, chunkMap);
+            currentPosition = collisionResponse.position;
+        }
+        camera.setPosition(currentPosition);
     } else {
-        newDirection = glm::vec3(glm::rotate(glm::mat4(1.0f), currentAngle.y, glm::vec3(0.0f, 1.0f, 0.0f)) * glm::vec4(movement.x, movement.y, movement.z, 1));;
+        finalMovement = glm::vec3(glm::rotate(glm::mat4(1.0f), currentAngle.y, glm::vec3(0.0f, 1.0f, 0.0f)) * glm::vec4(movement.x, movement.y, movement.z, 1));;
+        camera.updatePosition(finalMovement);
     }
 
 
 
-    camera.updatePosition(newDirection);
-
 }
 
 
+void Player::updatePhysics(){
+    collision = !collision;
+    gravity = !gravity;
+}
 
-void Player::keyEventListener(GLFWwindow* window , float deltaT , const std::unordered_map<glm::ivec3, Chunk*> &chunkMap ){
+
+void Player::keyEventListener(GLFWwindow* window , float deltaT ){
     movements.clear();
+       
     if(glfwGetKey(window, GLFW_KEY_A)) {
         movements.insert(MovementDirection::Left);
     }
@@ -92,8 +96,9 @@ void Player::keyEventListener(GLFWwindow* window , float deltaT , const std::uno
             movements.insert(MovementDirection::Up);
         }
     }
+    
 
-    update(deltaT , chunkMap);
+    update(deltaT);
 
 
 }

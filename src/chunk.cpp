@@ -345,8 +345,8 @@ std::vector<glm::ivec3> Chunk::getBlockPositions(){
 
     for (int x = 0 ; x < CHUNK_WIDTH ; x++){
         for(int y = 0 ; y< CHUNK_HEIGHT ; y++){
-            for(int z = 0; z < CHUNK_WIDTH ; z++){
-                if(blocks[x][y][z].type->isVisible()){
+            for(int z = 0; z < CHUNK_DEPTH ; z++){
+                if(blocks[x][y][z].type->isSolid){
                     positions.push_back(coordinates + glm::ivec3(x,y,z));
                 }
             }
@@ -355,6 +355,14 @@ std::vector<glm::ivec3> Chunk::getBlockPositions(){
 
     return positions;
 
+}
+
+bool Chunk::isBlockVisible(glm::ivec3 position){
+    // std::cout << position.x << " " << position.y << " " << position.z << std::endl;
+    position -= coordinates;
+    if(position.y >= CHUNK_HEIGHT) return false;
+
+    return blocks[position.x][position.y][position.z].type->isSolid;
 }
 
 
