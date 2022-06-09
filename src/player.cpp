@@ -64,6 +64,8 @@ void Player::update(float deltaT){
 void Player::updatePhysics(){
     collision = !collision;
     gravity = !gravity;
+    flying = (flying + 1) % 2;
+    speed = FLYING_SPEED * flying + NORMAL_SPEED * (1 - flying);
 }
 
 

@@ -75,7 +75,7 @@ Movement::CollisionResponseT Movement::resolveCollision(const glm::vec3& positio
     for (int i = 0; i < nSteps; ++i) {
         finalPos += step;
         auto collisionResponse = Movement::canMove(finalPos, chunkMap);
-        if (collisionResponse.collided) {
+        while (collisionResponse.collided) {
             collided = true;
             finalPos += collisionResponse.position;
             collisionResponse = Movement::canMove(finalPos, chunkMap);

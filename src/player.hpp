@@ -13,7 +13,10 @@ class Player{
     private:
         Camera& camera;
         std::unordered_map<glm::ivec3, Chunk*>& chunkMap;
-        const float speed = 5.0f;
+        float speed = 5.0f;
+        int flying = 0;
+        const float NORMAL_SPEED = 5.0f;
+        const float FLYING_SPEED = 50.f;
         bool collision =  true;
         bool gravity = true;
         bool canJump = false;

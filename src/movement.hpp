@@ -20,8 +20,8 @@ namespace MovementDirection {
 namespace Movement {
 
     struct CollisionResponseT {
-        bool collided;
-        glm::vec3 position;
+        bool collided = false;
+        glm::vec3 position{0};
     };
 
     static const float numSteps = 3.0f;

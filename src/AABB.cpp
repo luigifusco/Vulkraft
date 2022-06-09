@@ -83,7 +83,7 @@ bool AABB::intersect(AABB &aabb){
 }
 
 glm::vec3 AABB::getPopOut(AABB& aabb) {
-    const float OFF = 0.0000001f;
+    const float OFF = 0.001f;
     glm::vec3 mv(aabb.getMinX() - getMaxX() - OFF, 0, 0);
     if (abs(getMinX() - aabb.getMaxX()) < glm::length(mv)) {
         mv = glm::vec3(aabb.getMaxX() - getMinX() + OFF, 0, 0);
