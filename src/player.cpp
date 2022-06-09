@@ -21,13 +21,14 @@ void Player::update(float deltaT){
     if(gravity){
         gravityVector += glm::vec3(0,-1,0) * gravityFactor * deltaT;
 
-        auto collisionResponse = Movement::resolveCollision(currentPosition , gravityVector,  chunkMap);
-        currentPosition = collisionResponse.position;
+        auto collisionResponse = Movement::resolveCollision(currentPosition, gravityVector,  chunkMap);
 
         if(collisionResponse.collided){
             gravityVector = glm::vec3(0);
-            canJump = true;
+            if (currentPosition.y + gravityVector.y - collisionResponse.position.y > 0)
+                canJump = true;
         }
+        currentPosition = collisionResponse.position;
     }
 
     for(const auto & mov : movements){
