@@ -24,7 +24,7 @@ struct BlockVertex {
     glm::vec3 pos;
 	glm::vec3 norm;
     glm::vec2 tex;
-	int blend;
+	glm::vec3 mat;
 
     static VkVertexInputBindingDescription getBindingDescription();
     static std::array<VkVertexInputAttributeDescription, 4> getAttributeDescriptions();
@@ -58,11 +58,11 @@ class Chunk {
         std::vector<uint32_t> indices;
 		const std::unordered_map<glm::ivec3, Chunk*>& chunkMap;
 
-		std::vector<Direction> getVisibleFaces(int x, int y, int z);
+		std::vector<Direction> getVisibleFaces(int x, int y, int z, bool opaqueOnly);
 
 		void buildBlockFace(int x, int y, int z, Direction dir);
 	
-		void buildBlock(int x, int y, int z);
+		void buildBlock(int x, int y, int z, bool opaqueOnly);
 
 		void buildStructure(StructureMeta* meta);
 

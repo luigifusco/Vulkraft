@@ -19,13 +19,13 @@ class BlockType {
             return false;
         }
 
-        // virtual glm::vec3 getMaterialSettings() {
-        //     return glm::vec3(
-        //         0.0f,       // Blend (boolean)
-        //         2.0f,       // Roughness
-        //         200.0f      // Specularity
-        //     );
-        // }
+        virtual glm::vec3 getMaterialSettings() {
+            return glm::vec3(
+                0.0f,       // Blend (boolean)
+                2.0f,       // Roughness
+                200.0f      // Specularity
+            );
+        }
 
         virtual glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) = 0;        
 
@@ -119,6 +119,14 @@ class Water : public BlockType {
 
         bool shouldBlend() override {
             return true;
+        }
+
+        glm::vec3 getMaterialSettings() override {
+            return glm::vec3(
+                0.0f,       // Blend (boolean)
+                0.3f,       // Roughness
+                20.0f       // Specularity
+            );
         }
 
         glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
