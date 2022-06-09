@@ -239,7 +239,7 @@ private:
         createTextureImageView();
         createTextureSampler();
         initializeChunks();
-        drawAllChunks();
+        drawVisibleChunks();
         createVertexBuffer();
         createIndexBuffer();
         createUniformBuffers();
@@ -292,6 +292,7 @@ private:
     void updateUniformBuffer(uint32_t currentImage) {
 		static auto startTime = std::chrono::high_resolution_clock::now();
 		static float lastTime = 0.0f;
+        static glm::ivec3 oldChunkIndex(0, 0, 0);
 		
 		auto currentTime = std::chrono::high_resolution_clock::now();
 		float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
@@ -363,8 +364,14 @@ private:
             }
         }
 
+        bool shouldRedraw = false;
+
+        if (oldChunkIndex != baseChunkIndex) {
+            oldChunkIndex = baseChunkIndex;
+            shouldRedraw = true;
+        }
+
         if (!threadProcessing) {
-            bool newChunksDrawn = false;
             if (chunkIndexesToAdd.size()) {
                 std::vector<glm::ivec3> newChunks;
                 {
@@ -374,20 +381,20 @@ private:
                         outQ.pop();
                     }
                 }
-                newChunksDrawn = !newChunks.empty();
+                shouldRedraw = !newChunks.empty();
                 for (auto& iter : newChunks) {
                     chunkIndexesToAdd.erase(chunkIndexesToAdd.find(iter));
                 }
             }
-            if (newChunksDrawn) {
-                if (newChunksDrawn) {
-                    drawAllChunks();
-                }
-                if (vertices.size()) {
-                    curBuffer = (curBuffer + 1) % MAX_FRAMES_IN_FLIGHT;
-                    updateVertexBuffer();
-                    updateIndexBuffer();
-                }
+        }
+        if (shouldRedraw) {
+            if (shouldRedraw) {
+                drawVisibleChunks();
+            }
+            if (vertices.size()) {
+                curBuffer = (curBuffer + 1) % MAX_FRAMES_IN_FLIGHT;
+                updateVertexBuffer();
+                updateIndexBuffer();
             }
         }
 
@@ -448,17 +455,25 @@ private:
         }
     }
 
-    void drawAllChunks() {
+    void drawVisibleChunks() {
         vertices.clear();
         indices.clear();
-        std::vector<Chunk*> chunks;
+        std::vector<Chunk*> visibleChunks;
+        const int VIEW_RANGE = 2;
         {
             std::unique_lock l(mapM);
+            const glm::ivec3 baseChunkIndex = Chunk::findChunkIndex(player.getCamera().getPosition(), chunkMap);
             for (auto& iter : chunkMap) {
-                chunks.push_back(iter.second);
+                if (
+                    iter.first.x <= baseChunkIndex.x + CHUNK_WIDTH * VIEW_RANGE &&
+                    iter.first.x >= baseChunkIndex.x - CHUNK_WIDTH * VIEW_RANGE &&
+                    iter.first.z <= baseChunkIndex.z + CHUNK_DEPTH * VIEW_RANGE &&
+                    iter.first.z >= baseChunkIndex.z - CHUNK_DEPTH * VIEW_RANGE) {
+                visibleChunks.push_back(iter.second);
+                }
             }
         }
-        for (auto& iter : chunks) {
+        for (auto& iter : visibleChunks) {
             drawChunk(iter);
         }
     }
