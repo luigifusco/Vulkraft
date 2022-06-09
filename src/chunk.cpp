@@ -1,6 +1,5 @@
 #include <glm/glm.hpp>
 #include <vector>
-#include <map>
 #include <array>
 #include <unordered_map>
 
@@ -16,8 +15,8 @@
 
 #include <iostream>
 
-
 #include "blocks/block.hpp"
+#include "structures/structure.hpp"
 #include "utils/enums.hpp"
 #include "utils/perlin_noise.hpp"
 #include "chunk.hpp"
@@ -35,6 +34,8 @@ const Stone* STONE = new Stone();
 const Cobblestone* COBBLESTONE = new Cobblestone();
 const Sand* SAND = new Sand();
 const Bedrock* BEDROCK = new Bedrock();
+const Leaves* LEAVES = new Leaves();
+const Water* WATER = new Water();
 /* -------------------------  */
 
 Block::Block() {
@@ -50,8 +51,8 @@ VkVertexInputBindingDescription BlockVertex::getBindingDescription()  {
     return bindingDescription;
 }
 
-std::array<VkVertexInputAttributeDescription, 3> BlockVertex::getAttributeDescriptions() {
-        std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
+std::array<VkVertexInputAttributeDescription, 4> BlockVertex::getAttributeDescriptions() {
+        std::array<VkVertexInputAttributeDescription, 4> attributeDescriptions{};
 
         attributeDescriptions[0].binding = 0;
         attributeDescriptions[0].location = 0;
@@ -68,41 +69,59 @@ std::array<VkVertexInputAttributeDescription, 3> BlockVertex::getAttributeDescri
         attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
         attributeDescriptions[2].offset = offsetof(BlockVertex, tex);
 
+        attributeDescriptions[3].binding = 0;
+        attributeDescriptions[3].location = 3;
+        attributeDescriptions[3].format = VK_FORMAT_R32_SINT;
+        attributeDescriptions[3].offset = offsetof(BlockVertex, blend);
+
         return attributeDescriptions;
     }
 
+bool shouldSeeFace(Block self, Block other) {
+    return !other.type->isOpaque && (!self.type->shouldBlend() || self.type != other.type);
+}
 
 std::vector<Direction> Chunk::getVisibleFaces(int x, int y, int z) {
     Block block = blocks[x][y][z];
     std::vector<Direction> faces;
+
+    if(SHOW_CHUNK_BORDER) {
+        if(x == 0 && (y == 0 || z == 0 || y == CHUNK_HEIGHT - 1 || z == CHUNK_DEPTH - 1)) faces.push_back(Direction::West);
+        if(y == 0 && (x == 0 || z == 0 || x == CHUNK_WIDTH - 1 || z == CHUNK_DEPTH - 1)) faces.push_back(Direction::Down);
+        if(z == 0 && (x == 0 || y == 0 || x == CHUNK_WIDTH - 1 || y == CHUNK_HEIGHT - 1)) faces.push_back(Direction::South);
+        if(x == CHUNK_WIDTH - 1 && (y == 0 || z == 0 || y == CHUNK_HEIGHT - 1 || z == CHUNK_DEPTH - 1)) faces.push_back(Direction::East);
+        if(y == CHUNK_HEIGHT - 1 && (x == 0 || z == 0 || x == CHUNK_WIDTH - 1 || z == CHUNK_DEPTH - 1)) faces.push_back(Direction::Up);
+        if(z == CHUNK_DEPTH - 1 && (x == 0 || y == 0 || x == CHUNK_WIDTH - 1 || y == CHUNK_HEIGHT - 1)) faces.push_back(Direction::North);
+    }
+
     if(!block.type->isVisible()) return faces;
     if (x == 0) {
         glm::ivec3 wIndex(coordinates.x - CHUNK_WIDTH, coordinates.y, coordinates.z);
         auto iter = chunkMap.find(wIndex);
-        if (iter != chunkMap.end() && !iter->second->blocks[CHUNK_WIDTH - 1][y][z].type->isOpaque) faces.push_back(Direction::West);
-    } else if (!blocks[x - 1][y][z].type->isOpaque) faces.push_back(Direction::West);
+        if (iter != chunkMap.end() && shouldSeeFace(block, iter->second->blocks[CHUNK_WIDTH - 1][y][z])) faces.push_back(Direction::West);
+    } else if (shouldSeeFace(block, blocks[x - 1][y][z])) faces.push_back(Direction::West);
 
-    if(y == 0 || !blocks[x][y - 1][z].type->isOpaque) faces.push_back(Direction::Down);
+    if(y == 0 || shouldSeeFace(block, blocks[x][y - 1][z])) faces.push_back(Direction::Down);
 
     if (z == 0) {
         glm::ivec3 sIndex(coordinates.x, coordinates.y, coordinates.z - CHUNK_DEPTH);
         auto iter = chunkMap.find(sIndex);
-        if (iter != chunkMap.end() && !iter->second->blocks[x][y][CHUNK_DEPTH - 1].type->isOpaque) faces.push_back(Direction::South);
-    } else if (!blocks[x][y][z - 1].type->isOpaque) faces.push_back(Direction::South);
+        if (iter != chunkMap.end() && shouldSeeFace(block, iter->second->blocks[x][y][CHUNK_DEPTH - 1])) faces.push_back(Direction::South);
+    } else if (shouldSeeFace(block, blocks[x][y][z - 1])) faces.push_back(Direction::South);
 
     if (x == CHUNK_WIDTH - 1) {
         glm::ivec3 eIndex(coordinates.x + CHUNK_WIDTH, coordinates.y, coordinates.z);
         auto iter = chunkMap.find(eIndex);
-        if (iter != chunkMap.end() && !iter->second->blocks[0][y][z].type->isOpaque) faces.push_back(Direction::East);
-    } else if (!blocks[x + 1][y][z].type->isOpaque) faces.push_back(Direction::East);
+        if (iter != chunkMap.end() && shouldSeeFace(block, iter->second->blocks[0][y][z])) faces.push_back(Direction::East);
+    } else if (shouldSeeFace(block, blocks[x + 1][y][z])) faces.push_back(Direction::East);
 
-    if(y == CHUNK_HEIGHT - 1 || !blocks[x][y + 1][z].type->isOpaque) faces.push_back(Direction::Up);
+    if(y == CHUNK_HEIGHT - 1 || shouldSeeFace(block, blocks[x][y + 1][z])) faces.push_back(Direction::Up);
 
     if (z == CHUNK_DEPTH - 1) {
         glm::ivec3 nIndex(coordinates.x, coordinates.y, coordinates.z + CHUNK_DEPTH);
         auto iter = chunkMap.find(nIndex);
-        if (iter != chunkMap.end() && !iter->second->blocks[x][y][0].type->isOpaque) faces.push_back(Direction::North);
-    } else if (!blocks[x][y][z + 1].type->isOpaque) faces.push_back(Direction::North);
+        if (iter != chunkMap.end() && shouldSeeFace(block, iter->second->blocks[x][y][0])) faces.push_back(Direction::North);
+    } else if (shouldSeeFace(block, blocks[x][y][z + 1])) faces.push_back(Direction::North);
 
     return faces;
 }
@@ -112,11 +131,12 @@ void Chunk::buildBlockFace(int x, int y, int z, Direction dir) {
     BlockFace face = block.faces[dir];
     glm::ivec3 pos = coordinates + glm::ivec3(x, y, z);
     int index = vertices.size();
+    int blend = block.type->shouldBlend();
 
-    vertices.push_back({pos + face.a, face.norm, block.type->getTextureOffset(dir, face.a)});
-    vertices.push_back({pos + face.b, face.norm, block.type->getTextureOffset(dir, face.b)});
-    vertices.push_back({pos + face.c, face.norm, block.type->getTextureOffset(dir, face.c)});
-    vertices.push_back({pos + face.d, face.norm, block.type->getTextureOffset(dir, face.d)});
+    vertices.push_back({pos + face.a, face.norm, block.type->getTextureOffset(dir, face.a), blend});
+    vertices.push_back({pos + face.b, face.norm, block.type->getTextureOffset(dir, face.b), blend});
+    vertices.push_back({pos + face.c, face.norm, block.type->getTextureOffset(dir, face.c), blend});
+    vertices.push_back({pos + face.d, face.norm, block.type->getTextureOffset(dir, face.d), blend});
 
     indices.push_back(index + 0);
     indices.push_back(index + 1);
@@ -133,6 +153,15 @@ void Chunk::buildBlock(int x, int y, int z) {
     }
 }
 
+void Chunk::buildStructure(StructureMeta* meta) {
+    for(int i = 0; i < meta->size; i++) {
+        glm::ivec3 pos = meta->coords[i];
+        BlockType* type = meta->types[i];
+        if(type->isOpaque || blocks[pos.x][pos.y][pos.z].type == (BlockType*)AIR)
+            blocks[pos.x][pos.y][pos.z].type = meta->types[i];
+    }
+}
+
 int Chunk::sampleHeight(int x, int z, float depth) {
     static const int octaves = 20;
     int minY = 16 * depth;
@@ -146,21 +175,42 @@ int Chunk::sampleHeight(int x, int z, float depth) {
 }
 
 void Chunk::initTerrain() {
+    static const int waterLevel = 12;
+
     for (int x = 0; x < CHUNK_WIDTH; ++x) {
         for (int z = 0; z < CHUNK_DEPTH; ++z) {
-            int midY = sampleHeight(x, z, 0.4);
-            int maxY = sampleHeight(x, z, 1.0);
             blocks[x][0][z].type = (BlockType*) BEDROCK;
+            int midY = sampleHeight(x, z, 0.4);
             for(int y = 1; y < midY; ++y) {
                 blocks[x][y][z].type = (BlockType*) STONE;
             }
+            int maxY = sampleHeight(x, z, 1.0);
             for (int y = midY; y < maxY; ++y) {
                 blocks[x][y][z].type = (BlockType*) DIRT;
             }
-            if(SHOW_CHUNK_BORDER && (x == 0 || z == 0)) {
-                blocks[x][maxY][z].type = (BlockType*) DIRT;
+            if(maxY < waterLevel) {
+                blocks[x][maxY][z].type = (BlockType*) SAND;
             } else {
                 blocks[x][maxY][z].type = (BlockType*) GRASS;
+            }
+            for(int y = maxY + 1; y <= waterLevel; ++y) {
+                blocks[x][y][z].type = (BlockType*) WATER;
+            }
+        }
+    }
+}
+
+void Chunk::initTrees() {
+    for (int x = 2; x < CHUNK_WIDTH - 2; ++x) {
+        for (int z = 2; z < CHUNK_DEPTH - 2; ++z) {
+            if(perlin.normalizedOctave2D(x, z, 80) > 0.3) {
+                int y = sampleHeight(x, z, 1.0);
+                if(blocks[x][y][z].type == (BlockType*)GRASS) {
+                    glm::ivec3 base(x, y + 1, z);
+                    StructureMeta meta;
+                    Tree::generate(&meta, base);
+                    buildStructure(&meta);
+                }
             }
         }
     }
@@ -169,6 +219,7 @@ void Chunk::initTerrain() {
 
 Chunk::Chunk(glm::ivec3 pos, const std::unordered_map<glm::ivec3, Chunk*>& m) : coordinates(pos), chunkMap(m) {
     initTerrain();
+    initTrees();
 }
 
 Chunk::Chunk(int x, int y, int z, const std::unordered_map<glm::ivec3, Chunk*>& m) : Chunk(glm::ivec3(x, y, z), m) {}
@@ -200,8 +251,8 @@ void Chunk::clear() {
 
 std::vector<std::pair<glm::ivec3, Chunk*>> Chunk::getNeighbors() {
     std::vector<std::pair<glm::ivec3, Chunk*>> neighbors;
-    const int  xOff[] = { CHUNK_WIDTH, -CHUNK_WIDTH };
-    const int  zOff[] = {CHUNK_DEPTH, -CHUNK_DEPTH};
+    const int xOff[] = { CHUNK_WIDTH, -CHUNK_WIDTH };
+    const int zOff[] = {CHUNK_DEPTH, -CHUNK_DEPTH};
     for (int i = 0; i < 2; ++i) {
         for (int j = 0; j < 2; ++j) {
             glm::ivec3 newVec = coordinates + glm::ivec3(xOff[i], 0, zOff[j]);
@@ -245,21 +296,21 @@ void chunkGeneratorFunction(
                 inQ.pop();
             }
         }
-        std::unordered_set<Chunk*> toRebuild;
+        std::unordered_set<Chunk*> chunksToBuild;
         for (auto& curPos : toBuild) {
             auto iter = chunkMap.find(curPos);
             Chunk* newChunk;
             if (iter == chunkMap.end()) { // build new chunk
                 threadProcessing = true;
                 newChunk = new Chunk(curPos, chunkMap);
-                newChunk->build();
+                chunksToBuild.insert(newChunk);
                 {
                     std::unique_lock l(mapM);
                     chunkMap.insert(std::pair(curPos, newChunk));
                 }
                 std::vector<std::pair<glm::ivec3, Chunk*>> neighbors = newChunk->getNeighbors();
                 for (auto& c : neighbors) {
-                    toRebuild.insert(c.second);
+                    chunksToBuild.insert(c.second);
                 }
             }
             else { // rebuild chunk
@@ -268,7 +319,7 @@ void chunkGeneratorFunction(
             }
         }
 
-        for (auto& c : toRebuild) {
+        for (auto& c : chunksToBuild) {
             c->build();
         }
 

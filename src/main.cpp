@@ -166,7 +166,7 @@ private:
     std::vector<VkDeviceMemory> vertexBufferMemory;
     std::vector<VkBuffer> indexBuffer;
     std::vector<VkDeviceMemory> indexBufferMemory;
-    std::vector<bool> bufferShouldUpdate;
+    int curBuffer = 0;
 
     std::vector<VkBuffer> vertexUniformBuffers;
     std::vector<VkDeviceMemory> vertexUniformBuffersMemory;
@@ -239,7 +239,7 @@ private:
         createTextureImageView();
         createTextureSampler();
         initializeChunks();
-        drawAllChunks();
+        drawVisibleChunks();
         createVertexBuffer();
         createIndexBuffer();
         createUniformBuffers();
@@ -292,6 +292,7 @@ private:
     void updateUniformBuffer(uint32_t currentImage) {
 		static auto startTime = std::chrono::high_resolution_clock::now();
 		static float lastTime = 0.0f;
+        static glm::ivec3 oldChunkIndex(0, 0, 0);
 		
 		auto currentTime = std::chrono::high_resolution_clock::now();
 		float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
@@ -308,7 +309,7 @@ private:
             }
         }
 
-        const float SUN_SPEED = glm::radians(0.3f);
+        const float SUN_SPEED = glm::radians(0.03f);
 
 
 
@@ -368,8 +369,14 @@ private:
             }
         }
 
+        bool shouldRedraw = false;
+
+        if (oldChunkIndex != baseChunkIndex) {
+            oldChunkIndex = baseChunkIndex;
+            shouldRedraw = true;
+        }
+
         if (!threadProcessing) {
-            bool newChunksDrawn = false;
             if (chunkIndexesToAdd.size()) {
                 std::vector<glm::ivec3> newChunks;
                 {
@@ -379,26 +386,20 @@ private:
                         outQ.pop();
                     }
                 }
-                newChunksDrawn = !newChunks.empty();
+                shouldRedraw = !newChunks.empty();
                 for (auto& iter : newChunks) {
                     chunkIndexesToAdd.erase(chunkIndexesToAdd.find(iter));
                 }
             }
-            if (newChunksDrawn || bufferShouldUpdate[currentFrame]) {
-                if (newChunksDrawn) {
-                    drawAllChunks();
-                }
-                if (vertices.size()) {
-                    updateVertexBuffer(currentFrame);
-                    updateIndexBuffer(currentFrame);
-                    bufferShouldUpdate[currentFrame] = false;
-                    if (newChunksDrawn) {
-                        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
-                            if (i == currentFrame) continue;
-                            bufferShouldUpdate[i] = true;
-                        }
-                    }
-                }
+        }
+        if (shouldRedraw) {
+            if (shouldRedraw) {
+                drawVisibleChunks();
+            }
+            if (vertices.size()) {
+                curBuffer = (curBuffer + 1) % MAX_FRAMES_IN_FLIGHT;
+                updateVertexBuffer();
+                updateIndexBuffer();
             }
         }
 
@@ -459,17 +460,25 @@ private:
         }
     }
 
-    void drawAllChunks() {
+    void drawVisibleChunks() {
         vertices.clear();
         indices.clear();
-        std::vector<Chunk*> chunks;
+        std::vector<Chunk*> visibleChunks;
+        const int VIEW_RANGE = 2;
         {
             std::unique_lock l(mapM);
+            const glm::ivec3 baseChunkIndex = Chunk::findChunkIndex(player.getCamera().getPosition(), chunkMap);
             for (auto& iter : chunkMap) {
-                chunks.push_back(iter.second);
+                if (
+                    iter.first.x <= baseChunkIndex.x + CHUNK_WIDTH * VIEW_RANGE &&
+                    iter.first.x >= baseChunkIndex.x - CHUNK_WIDTH * VIEW_RANGE &&
+                    iter.first.z <= baseChunkIndex.z + CHUNK_DEPTH * VIEW_RANGE &&
+                    iter.first.z >= baseChunkIndex.z - CHUNK_DEPTH * VIEW_RANGE) {
+                visibleChunks.push_back(iter.second);
+                }
             }
         }
-        for (auto& iter : chunks) {
+        for (auto& iter : visibleChunks) {
             drawChunk(iter);
         }
     }
@@ -949,7 +958,13 @@ private:
 
         VkPipelineColorBlendAttachmentState colorBlendAttachment{};
         colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-        colorBlendAttachment.blendEnable = VK_FALSE;
+        colorBlendAttachment.blendEnable = VK_TRUE;
+        colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+        colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+        colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+        colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+        colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
 
         VkPipelineColorBlendStateCreateInfo colorBlending{};
         colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
@@ -1399,7 +1414,6 @@ private:
     void createVertexBuffer() {
         VkDeviceSize bufferSize = sizeof(BlockVertex) * vertices.size();
 
-        bufferShouldUpdate.resize(MAX_FRAMES_IN_FLIGHT, false);
         vertexBuffer.resize(MAX_FRAMES_IN_FLIGHT);
         vertexBufferMemory.resize(MAX_FRAMES_IN_FLIGHT);
 
@@ -1421,7 +1435,7 @@ private:
         }
     }
 
-    void updateVertexBuffer(int cur_frame) {
+    void updateVertexBuffer() {
         VkDeviceSize bufferSize = sizeof(BlockVertex) * vertices.size();
 
         VkBuffer stagingBuffer;
@@ -1432,11 +1446,11 @@ private:
         memcpy(data, vertices.data(), (size_t)bufferSize);
         vkUnmapMemory(device, stagingBufferMemory);
 
-        vkDestroyBuffer(device, vertexBuffer[cur_frame], nullptr);
-        vkFreeMemory(device, vertexBufferMemory[cur_frame], nullptr);
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer[cur_frame], vertexBufferMemory[cur_frame]);
+        vkDestroyBuffer(device, vertexBuffer[curBuffer], nullptr);
+        vkFreeMemory(device, vertexBufferMemory[curBuffer], nullptr);
+        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer[curBuffer], vertexBufferMemory[curBuffer]);
         
-        copyBuffer(stagingBuffer, vertexBuffer[cur_frame], bufferSize);
+        copyBuffer(stagingBuffer, vertexBuffer[curBuffer], bufferSize);
 
         vkDestroyBuffer(device, stagingBuffer, nullptr);
         vkFreeMemory(device, stagingBufferMemory, nullptr);
@@ -1467,7 +1481,7 @@ private:
         }
     }
 
-    void updateIndexBuffer(int cur_frame) {
+    void updateIndexBuffer() {
         VkDeviceSize bufferSize = sizeof(uint32_t) * indices.size();
 
         VkBuffer stagingBuffer;
@@ -1479,11 +1493,11 @@ private:
         memcpy(data, indices.data(), (size_t)bufferSize);
         vkUnmapMemory(device, stagingBufferMemory);
 
-        vkDestroyBuffer(device, indexBuffer[cur_frame], nullptr);
-        vkFreeMemory(device, indexBufferMemory[cur_frame], nullptr);
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer[cur_frame], indexBufferMemory[cur_frame]);
+        vkDestroyBuffer(device, indexBuffer[curBuffer], nullptr);
+        vkFreeMemory(device, indexBufferMemory[curBuffer], nullptr);
+        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer[curBuffer], indexBufferMemory[curBuffer]);
 
-        copyBuffer(stagingBuffer, indexBuffer[cur_frame], bufferSize);
+        copyBuffer(stagingBuffer, indexBuffer[curBuffer], bufferSize);
 
         vkDestroyBuffer(device, stagingBuffer, nullptr);
         vkFreeMemory(device, stagingBufferMemory, nullptr);
@@ -1711,11 +1725,11 @@ private:
 
             vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
-            VkBuffer vertexBuffers[] = {vertexBuffer[currentFrame]};
+            VkBuffer vertexBuffers[] = {vertexBuffer[curBuffer]};
             VkDeviceSize offsets[] = {0};
             vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
-            vkCmdBindIndexBuffer(commandBuffer, indexBuffer[currentFrame], 0, VK_INDEX_TYPE_UINT32);
+            vkCmdBindIndexBuffer(commandBuffer, indexBuffer[curBuffer], 0, VK_INDEX_TYPE_UINT32);
 
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
 

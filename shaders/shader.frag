@@ -13,6 +13,7 @@ layout(binding = 2) uniform sampler2D texSampler;
 layout(location = 0) in vec3 fragNorm;
 layout(location = 1) in vec2 fragTexCoord;
 layout(location = 2) in vec3 fragPos;
+layout(location = 3) flat in int fragBlend;
 
 layout(location = 0) out vec4 outColor;
 
@@ -49,7 +50,10 @@ void main() {
 	float sigma = 2.0f;		// Oren Nayar BRDF parameter
 	float gamma = 200.0f;	// Phong BRDF parameter
 	
-	vec3 DiffColor = texture(texSampler, fragTexCoord).rgb;
+	vec4 Texture = texture(texSampler, fragTexCoord);
+	if(Texture.a == 0) discard;
+
+	vec3 DiffColor = Texture.rgb;
 	
 	vec3 Diffuse = vec3(0);
 	Diffuse += Oren_Nayar_Diffuse_BRDF(lightDir0, Norm, EyeDir, DiffColor, sigma) * ubo.lightCol0;
@@ -61,5 +65,9 @@ void main() {
 
 	vec3 Ambient = ubo.ambFactor.x * DiffColor;
 	
-	outColor = vec4(Diffuse + Specular + Ambient, 1.0f);	
+	if(fragBlend == 1) {
+		outColor = vec4(Diffuse + Specular + Ambient, Texture.a);
+	} else {
+		outColor = vec4(Diffuse + Specular + Ambient, 1.0f);
+	}
 }

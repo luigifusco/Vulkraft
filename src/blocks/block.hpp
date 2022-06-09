@@ -15,9 +15,21 @@ class BlockType {
             return true;
         }
 
-        virtual glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) = 0;
+        virtual bool shouldBlend() {
+            return false;
+        }
 
-        glm::ivec2 purge(Direction dir, glm::ivec3 coords);
+        // virtual glm::vec3 getMaterialSettings() {
+        //     return glm::vec3(
+        //         0.0f,       // Blend (boolean)
+        //         2.0f,       // Roughness
+        //         200.0f      // Specularity
+        //     );
+        // }
+
+        virtual glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) = 0;        
+
+        glm::vec2 purge(Direction dir, glm::ivec3 coords);
 };
 
 class Air : public BlockType {
@@ -93,3 +105,35 @@ class Bedrock : public BlockType {
 
         glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
 };
+
+class Leaves : public BlockType {
+    public:
+        Leaves() : BlockType(true, false) {};
+
+        glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
+};
+
+class Water : public BlockType {
+    public:
+        Water() : BlockType(false, false) {};
+
+        bool shouldBlend() override {
+            return true;
+        }
+
+        glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
+};
+
+/* singleton block definition */
+extern const Air* AIR;
+extern const Dirt* DIRT;
+extern const Grass* GRASS;
+extern const WoodLog* WOOD_LOG;
+extern const WoodPlank* WOOD_PLANK;
+extern const Stone* STONE;
+extern const Cobblestone* COBBLESTONE;
+extern const Sand* SAND;
+extern const Bedrock* BEDROCK;
+extern const Leaves* LEAVES;
+extern const Water* WATER;
+/* -------------------------  */
