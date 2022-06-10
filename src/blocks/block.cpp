@@ -119,6 +119,11 @@ glm::vec2 Leaves::getTextureOffset(Direction dir, glm::ivec3 corner) {
 glm::vec2 Water::getTextureOffset(Direction dir, glm::ivec3 corner) {
 	glm::vec2 fileOffset(13, 12);
 	glm::vec2 blockOffset = BlockType::purge(dir, corner);
-    // std::cout<< blockOffset.x << ", "<< blockOffset.y << std::endl;
+    return (fileOffset + blockOffset) * BlockType::textureSize;
+}
+
+glm::vec2 Bush::getTextureOffset(Direction dir, glm::ivec3 corner) {
+	glm::vec2 fileOffset(7, 2);
+	glm::vec2 blockOffset = BlockType::purge(dir, corner);
     return (fileOffset + blockOffset) * BlockType::textureSize;
 }

@@ -36,10 +36,20 @@ const Sand* SAND = new Sand();
 const Bedrock* BEDROCK = new Bedrock();
 const Leaves* LEAVES = new Leaves();
 const Water* WATER = new Water();
+const Bush* BUSH = new Bush();
 /* -------------------------  */
 
 Block::Block() {
     type = (BlockType*) AIR;
+}
+
+BlockFace* Block::getFace(Direction dir) {
+    if(type->isDiagonal()) {
+        if(diagonals.count(dir) == 0) return NULL;
+        return &diagonals[dir];
+    }
+    if(faces.count(dir) == 0) return NULL;
+    return &faces[dir];
 }
 
 VkVertexInputBindingDescription BlockVertex::getBindingDescription()  {
@@ -131,15 +141,17 @@ std::vector<Direction> Chunk::getVisibleFaces(int x, int y, int z, bool opaqueOn
 
 void Chunk::buildBlockFace(int x, int y, int z, Direction dir) {
     Block block = blocks[x][y][z];
-    BlockFace face = block.faces[dir];
+    BlockFace* face = block.getFace(dir);
+    if(face == NULL) return;
+
     glm::ivec3 pos = coordinates + glm::ivec3(x, y, z);
     int index = vertices.size();
     glm::vec3 mat = block.type->getMaterialSettings();
 
-    vertices.push_back({pos + face.a, face.norm, block.type->getTextureOffset(dir, face.a), mat});
-    vertices.push_back({pos + face.b, face.norm, block.type->getTextureOffset(dir, face.b), mat});
-    vertices.push_back({pos + face.c, face.norm, block.type->getTextureOffset(dir, face.c), mat});
-    vertices.push_back({pos + face.d, face.norm, block.type->getTextureOffset(dir, face.d), mat});
+    vertices.push_back({pos + face->a, face->norm, block.type->getTextureOffset(dir, face->a), mat});
+    vertices.push_back({pos + face->b, face->norm, block.type->getTextureOffset(dir, face->b), mat});
+    vertices.push_back({pos + face->c, face->norm, block.type->getTextureOffset(dir, face->c), mat});
+    vertices.push_back({pos + face->d, face->norm, block.type->getTextureOffset(dir, face->d), mat});
 
     indices.push_back(index + 0);
     indices.push_back(index + 1);
@@ -203,12 +215,17 @@ void Chunk::initTerrain() {
     }
 }
 
-void Chunk::initTrees() {
+void Chunk::initPlants() {
     for (int x = 2; x < CHUNK_WIDTH - 2; ++x) {
         for (int z = 2; z < CHUNK_DEPTH - 2; ++z) {
-            if(perlin.normalizedOctave2D(x, z, 80) > 0.3) {
-                int y = sampleHeight(x, z, 1.0);
-                if(blocks[x][y][z].type == (BlockType*)GRASS) {
+            double noise = perlin.normalizedOctave2D(x, z, 80);
+            int y = sampleHeight(x, z, 1.0);
+            if(noise < -0.2) {
+                if(blocks[x][y][z].type == (BlockType*) GRASS) {
+                    blocks[x][y + 1][z].type = (BlockType*) BUSH;
+                }
+            } else if(noise > 0.3) {
+                if(blocks[x][y][z].type == (BlockType*) GRASS) {
                     glm::ivec3 base(x, y + 1, z);
                     StructureMeta meta;
                     Tree::generate(&meta, base);
@@ -222,7 +239,7 @@ void Chunk::initTrees() {
 
 Chunk::Chunk(glm::ivec3 pos, const std::unordered_map<glm::ivec3, Chunk*>& m) : coordinates(pos), chunkMap(m) {
     initTerrain();
-    initTrees();
+    initPlants();
 }
 
 Chunk::Chunk(int x, int y, int z, const std::unordered_map<glm::ivec3, Chunk*>& m) : Chunk(glm::ivec3(x, y, z), m) {}

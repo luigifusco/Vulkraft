@@ -11,6 +11,10 @@ class BlockType {
 
         BlockType(bool _isSolid, bool _isOpaque) : isSolid(_isSolid), isOpaque(_isOpaque) {}
 
+        virtual bool isDiagonal() {
+            return false;
+        }
+
         virtual bool isVisible() {
             return true;
         }
@@ -123,10 +127,21 @@ class Water : public BlockType {
 
         glm::vec3 getMaterialSettings() override {
             return glm::vec3(
-                0.0f,       // Blend (boolean)
+                1.0f,       // Blend (boolean)
                 0.3f,       // Roughness
                 20.0f       // Specularity
             );
+        }
+
+        glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
+};
+
+class Bush : public BlockType {
+    public:
+        Bush() : BlockType(false, false) {};
+
+        bool isDiagonal() override {
+            return true;
         }
 
         glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
@@ -144,4 +159,5 @@ extern const Sand* SAND;
 extern const Bedrock* BEDROCK;
 extern const Leaves* LEAVES;
 extern const Water* WATER;
+extern const Bush* BUSH;
 /* -------------------------  */
