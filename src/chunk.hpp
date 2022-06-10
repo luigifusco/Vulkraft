@@ -67,11 +67,13 @@ class Chunk {
         glm::ivec3 coordinates;
         std::vector<BlockVertex> vertices;
         std::vector<uint32_t> indices;
+		std::vector<BlockVertex> waterVertices;
+		std::vector<uint32_t> waterIndices;
 		const std::unordered_map<glm::ivec3, Chunk*>& chunkMap;
 
 		std::vector<Direction> getVisibleFaces(int x, int y, int z, bool opaqueOnly);
 
-		void buildBlockFace(int x, int y, int z, Direction dir);
+		void buildBlockFace(int x, int y, int z, Direction dir, bool opaqueOnly);
 	
 		void buildBlock(int x, int y, int z, bool opaqueOnly);
 
@@ -93,6 +95,10 @@ class Chunk {
 		std::vector<BlockVertex> getVertices();
 
 		std::vector<uint32_t> getIndices();
+
+		std::vector<BlockVertex> getWaterVertices();
+
+		std::vector<uint32_t> getWaterIndices();
 
         void build();
 

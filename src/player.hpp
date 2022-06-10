@@ -9,7 +9,7 @@
 #include "chunk.hpp"
 #include <unordered_set>
 
-class Player{
+class Player {
     private:
         Camera& camera;
         std::unordered_map<glm::ivec3, Chunk*>& chunkMap;

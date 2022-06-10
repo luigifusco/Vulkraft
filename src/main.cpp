@@ -112,6 +112,8 @@ struct FragmentUniformBufferObject {
 class HelloTriangleApplication {
 public:
     void run() {
+        waterVertices.resize(1);
+        waterIndices.resize(3);
         initWindow();
         initVulkan();
         mainLoop();
@@ -166,6 +168,12 @@ private:
     std::vector<VkDeviceMemory> vertexBufferMemory;
     std::vector<VkBuffer> indexBuffer;
     std::vector<VkDeviceMemory> indexBufferMemory;
+    std::vector<BlockVertex> waterVertices;
+    std::vector<uint32_t> waterIndices;
+    std::vector<VkBuffer> waterVertexBuffer;
+    std::vector<VkDeviceMemory> waterVertexBufferMemory;
+    std::vector<VkBuffer> waterIndexBuffer;
+    std::vector<VkDeviceMemory> waterIndexBufferMemory;
     int curBuffer = 0;
 
     std::vector<VkBuffer> vertexUniformBuffers;
@@ -329,6 +337,10 @@ private:
         if (glfwGetKey(window, GLFW_KEY_R)) {
             vertices.clear();
             indices.clear();
+            waterVertices.clear();
+            waterIndices.clear();
+            waterVertices.resize(1);
+            waterIndices.resize(3);
             isThreadStopped = true;
             inC.notify_one();
             chunkThread.join();
@@ -450,6 +462,15 @@ private:
             indices.push_back(curIndices[i] + vertices.size());
         }
         vertices.insert(vertices.end(), curVertices.begin(), curVertices.end());
+
+        std::vector<BlockVertex> curWaterVertices = newChunk->getWaterVertices();
+        std::vector<uint32_t> curWaterIndices = newChunk->getWaterIndices();
+
+        waterIndices.reserve(waterIndices.size() + curWaterIndices.size());
+        for (int i = 0; i < curWaterIndices.size(); ++i) {
+            waterIndices.push_back(curWaterIndices[i] + waterVertices.size());
+        }
+        waterVertices.insert(waterVertices.end(), curWaterVertices.begin(), curWaterVertices.end());
     }
 
     void initializeChunks() {
@@ -463,6 +484,10 @@ private:
     void drawVisibleChunks() {
         vertices.clear();
         indices.clear();
+        waterVertices.clear();
+        waterIndices.clear();
+        waterVertices.resize(1);
+        waterIndices.resize(3);
         std::vector<Chunk*> visibleChunks;
         const int VIEW_RANGE = 2;
         {
@@ -533,6 +558,12 @@ private:
 
             vkDestroyBuffer(device, vertexBuffer[i], nullptr);
             vkFreeMemory(device, vertexBufferMemory[i], nullptr);
+
+            vkDestroyBuffer(device, waterIndexBuffer[i], nullptr);
+            vkFreeMemory(device, waterIndexBufferMemory[i], nullptr);
+
+            vkDestroyBuffer(device, waterVertexBuffer[i], nullptr);
+            vkFreeMemory(device, waterVertexBufferMemory[i], nullptr);
         }
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -1380,42 +1411,13 @@ private:
         endSingleTimeCommands(commandBuffer);
     }
 
-    /*void loadModel() {
-        tinyobj::attrib_t attrib;
-        std::vector<tinyobj::shape_t> shapes;
-        std::vector<tinyobj::material_t> materials;
-        std::string warn, err;
-        if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, MODEL_PATH.c_str())) {
-            throw std::runtime_error(warn + err);
-        }
-        std::unordered_map<Vertex, uint32_t> uniqueVertices{};
-        for (const auto& shape : shapes) {
-            for (const auto& index : shape.mesh.indices) {
-                Vertex vertex{};
-                vertex.pos = {
-                    attrib.vertices[3 * index.vertex_index + 0],
-                    attrib.vertices[3 * index.vertex_index + 1],
-                    attrib.vertices[3 * index.vertex_index + 2]
-                };
-                vertex.texCoord = {
-                    attrib.texcoords[2 * index.texcoord_index + 0],
-                    1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
-                };
-                vertex.color = {1.0f, 1.0f, 1.0f};
-                if (uniqueVertices.count(vertex) == 0) {
-                    uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
-                    vertices.push_back(vertex);
-                }
-                indices.push_back(uniqueVertices[vertex]);
-            }
-        }
-    }*/
-
     void createVertexBuffer() {
         VkDeviceSize bufferSize = sizeof(BlockVertex) * vertices.size();
 
         vertexBuffer.resize(MAX_FRAMES_IN_FLIGHT);
         vertexBufferMemory.resize(MAX_FRAMES_IN_FLIGHT);
+        waterVertexBuffer.resize(MAX_FRAMES_IN_FLIGHT);
+        waterVertexBufferMemory.resize(MAX_FRAMES_IN_FLIGHT);
 
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
             VkBuffer stagingBuffer;
@@ -1429,6 +1431,25 @@ private:
             createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer[i], vertexBufferMemory[i]);
 
             copyBuffer(stagingBuffer, vertexBuffer[i], bufferSize);
+
+            vkDestroyBuffer(device, stagingBuffer, nullptr);
+            vkFreeMemory(device, stagingBufferMemory, nullptr);
+        }
+
+        bufferSize = sizeof(BlockVertex) * waterVertices.size();
+
+        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
+            VkBuffer stagingBuffer;
+            VkDeviceMemory stagingBufferMemory;
+            createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+            void* data;
+            vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+            memcpy(data, waterVertices.data(), (size_t)bufferSize);
+            vkUnmapMemory(device, stagingBufferMemory);
+
+            createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, waterVertexBuffer[i], waterVertexBufferMemory[i]);
+
+            copyBuffer(stagingBuffer, waterVertexBuffer[i], bufferSize);
 
             vkDestroyBuffer(device, stagingBuffer, nullptr);
             vkFreeMemory(device, stagingBufferMemory, nullptr);
@@ -1454,6 +1475,24 @@ private:
 
         vkDestroyBuffer(device, stagingBuffer, nullptr);
         vkFreeMemory(device, stagingBufferMemory, nullptr);
+
+
+
+        bufferSize = sizeof(BlockVertex) * waterVertices.size();
+
+        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+        memcpy(data, waterVertices.data(), (size_t)bufferSize);
+        vkUnmapMemory(device, stagingBufferMemory);
+
+        vkDestroyBuffer(device, waterVertexBuffer[curBuffer], nullptr);
+        vkFreeMemory(device, waterVertexBufferMemory[curBuffer], nullptr);
+        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, waterVertexBuffer[curBuffer], waterVertexBufferMemory[curBuffer]);
+
+        copyBuffer(stagingBuffer, waterVertexBuffer[curBuffer], bufferSize);
+
+        vkDestroyBuffer(device, stagingBuffer, nullptr);
+        vkFreeMemory(device, stagingBufferMemory, nullptr);
     }
 
     void createIndexBuffer() {
@@ -1461,6 +1500,8 @@ private:
 
         indexBuffer.resize(MAX_FRAMES_IN_FLIGHT);
         indexBufferMemory.resize(MAX_FRAMES_IN_FLIGHT);
+        waterIndexBuffer.resize(MAX_FRAMES_IN_FLIGHT);
+        waterIndexBufferMemory.resize(MAX_FRAMES_IN_FLIGHT);
 
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
             VkBuffer stagingBuffer;
@@ -1475,6 +1516,26 @@ private:
             createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer[i], indexBufferMemory[i]);
 
             copyBuffer(stagingBuffer, indexBuffer[i], bufferSize);
+
+            vkDestroyBuffer(device, stagingBuffer, nullptr);
+            vkFreeMemory(device, stagingBufferMemory, nullptr);
+        }
+
+        bufferSize = sizeof(uint32_t) * waterIndices.size();
+
+        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
+            VkBuffer stagingBuffer;
+            VkDeviceMemory stagingBufferMemory;
+            createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+            void* data;
+            vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+            memcpy(data, waterIndices.data(), (size_t)bufferSize);
+            vkUnmapMemory(device, stagingBufferMemory);
+
+            createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, waterIndexBuffer[i], waterIndexBufferMemory[i]);
+
+            copyBuffer(stagingBuffer, waterIndexBuffer[i], bufferSize);
 
             vkDestroyBuffer(device, stagingBuffer, nullptr);
             vkFreeMemory(device, stagingBufferMemory, nullptr);
@@ -1498,6 +1559,24 @@ private:
         createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer[curBuffer], indexBufferMemory[curBuffer]);
 
         copyBuffer(stagingBuffer, indexBuffer[curBuffer], bufferSize);
+
+        vkDestroyBuffer(device, stagingBuffer, nullptr);
+        vkFreeMemory(device, stagingBufferMemory, nullptr);
+
+
+        bufferSize = sizeof(uint32_t) * waterIndices.size();
+
+        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+        memcpy(data, waterIndices.data(), (size_t)bufferSize);
+        vkUnmapMemory(device, stagingBufferMemory);
+
+        vkDestroyBuffer(device, waterIndexBuffer[curBuffer], nullptr);
+        vkFreeMemory(device, waterIndexBufferMemory[curBuffer], nullptr);
+        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, waterIndexBuffer[curBuffer], waterIndexBufferMemory[curBuffer]);
+
+        copyBuffer(stagingBuffer, waterIndexBuffer[curBuffer], bufferSize);
 
         vkDestroyBuffer(device, stagingBuffer, nullptr);
         vkFreeMemory(device, stagingBufferMemory, nullptr);
@@ -1734,6 +1813,16 @@ private:
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
 
             vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+
+
+
+            VkBuffer waterVertexBuffers[] = {waterVertexBuffer[curBuffer]};
+            VkDeviceSize waterOffsets[] = { 0 };
+            vkCmdBindVertexBuffers(commandBuffer, 0, 1, waterVertexBuffers, waterOffsets);
+
+            vkCmdBindIndexBuffer(commandBuffer, waterIndexBuffer[curBuffer], 0, VK_INDEX_TYPE_UINT32);
+
+            vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(waterIndices.size()), 1, 0, 0, 0);
 
         vkCmdEndRenderPass(commandBuffer);
 

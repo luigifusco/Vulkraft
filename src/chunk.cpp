@@ -139,32 +139,48 @@ std::vector<Direction> Chunk::getVisibleFaces(int x, int y, int z, bool opaqueOn
     return faces;
 }
 
-void Chunk::buildBlockFace(int x, int y, int z, Direction dir) {
+void Chunk::buildBlockFace(int x, int y, int z, Direction dir, bool opaqueOnly) {
     Block block = blocks[x][y][z];
     BlockFace* face = block.getFace(dir);
     if(face == NULL) return;
 
     glm::ivec3 pos = coordinates + glm::ivec3(x, y, z);
-    int index = vertices.size();
     glm::vec3 mat = block.type->getMaterialSettings();
 
-    vertices.push_back({pos + face->a, face->norm, block.type->getTextureOffset(dir, face->a), mat});
-    vertices.push_back({pos + face->b, face->norm, block.type->getTextureOffset(dir, face->b), mat});
-    vertices.push_back({pos + face->c, face->norm, block.type->getTextureOffset(dir, face->c), mat});
-    vertices.push_back({pos + face->d, face->norm, block.type->getTextureOffset(dir, face->d), mat});
+    if (opaqueOnly) {
+        int index = vertices.size();
+        vertices.push_back({pos + face->a, face->norm, block.type->getTextureOffset(dir, face->a), mat});
+        vertices.push_back({pos + face->b, face->norm, block.type->getTextureOffset(dir, face->b), mat});
+        vertices.push_back({pos + face->c, face->norm, block.type->getTextureOffset(dir, face->c), mat});
+        vertices.push_back({pos + face->d, face->norm, block.type->getTextureOffset(dir, face->d), mat});
 
-    indices.push_back(index + 0);
-    indices.push_back(index + 1);
-    indices.push_back(index + 2);
-    indices.push_back(index + 0);
-    indices.push_back(index + 2);
-    indices.push_back(index + 3);
+        indices.push_back(index + 0);
+        indices.push_back(index + 1);
+        indices.push_back(index + 2);
+        indices.push_back(index + 0);
+        indices.push_back(index + 2);
+        indices.push_back(index + 3);
+    }
+    else {
+        int index = waterVertices.size();
+        waterVertices.push_back({ pos + face->a, face->norm, block.type->getTextureOffset(dir, face->a), mat });
+        waterVertices.push_back({ pos + face->b, face->norm, block.type->getTextureOffset(dir, face->b), mat });
+        waterVertices.push_back({ pos + face->c, face->norm, block.type->getTextureOffset(dir, face->c), mat });
+        waterVertices.push_back({ pos + face->d, face->norm, block.type->getTextureOffset(dir, face->d), mat });
+
+        waterIndices.push_back(index + 0);
+        waterIndices.push_back(index + 1);
+        waterIndices.push_back(index + 2);
+        waterIndices.push_back(index + 0);
+        waterIndices.push_back(index + 2);
+        waterIndices.push_back(index + 3);
+    }
 }
 
 void Chunk::buildBlock(int x, int y, int z, bool opaqueOnly) {
     std::vector<Direction> visibleFaces = getVisibleFaces(x, y, z, opaqueOnly);
     for(const Direction &dir : visibleFaces) {
-        buildBlockFace(x, y, z, dir);
+        buildBlockFace(x, y, z, dir, opaqueOnly);
     }
 }
 
@@ -250,6 +266,14 @@ std::vector<BlockVertex> Chunk::getVertices() {
 
 std::vector<uint32_t> Chunk::getIndices() {
     return indices;
+}
+
+std::vector<BlockVertex> Chunk::getWaterVertices() {
+    return waterVertices;
+}
+
+std::vector<uint32_t> Chunk::getWaterIndices() {
+    return waterIndices;
 }
 
 void Chunk::build() {
