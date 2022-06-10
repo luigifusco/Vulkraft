@@ -7,6 +7,7 @@ layout(binding = 1) uniform FragmentUniformBufferObject {
 	vec3 lightCol1;
 	vec3 eyePos;
 	vec2 ambFactor;
+	vec3 eyeDir;
 } ubo;
 layout(binding = 2) uniform sampler2D texSampler;
 
@@ -40,6 +41,15 @@ vec3 Phong_Specular_BRDF(vec3 lightDir, vec3 normVect, vec3 viewDir, vec3 mainCo
 	return mainColor * pow(clamp(dot(viewDir, R), 0, 1), gamma);
 }
 
+vec3 spot_light_color(vec3 pos) {
+	// Spot light color
+	float cos_alpha = dot(normalize(ubo.eyePos - pos), ubo.eyeDir);
+	float c_in = cos(0.261799f);
+	float c_out = cos(0.523599f);
+	float dimming = clamp((cos_alpha - c_out) / (c_in - c_out), 0, 1);
+	return vec3(.3 * (244./255.),.3 * (252./255.),.3 * (3./255.)) * dimming * pow((1 / length(ubo.eyePos - pos)),1.f);
+}
+
 void main() {
 	vec3 Norm = normalize(fragNorm);
 	vec3 EyeDir = normalize(ubo.eyePos - fragPos);
@@ -61,10 +71,15 @@ void main() {
 	Specular += Phong_Specular_BRDF(lightDir1, Norm, EyeDir, vec3(0.05), fragMaterial.z) * ubo.lightCol1;
 
 	vec3 Ambient = ubo.ambFactor.x * DiffColor;
+
+	vec3 SpotLight = vec3(0);
+	if (lightDir1.y > 0) {
+		SpotLight = spot_light_color(fragPos) * DiffColor;
+	}
 	
 	if(fragMaterial.x == 1.0f) {
 		outColor = vec4(Diffuse + Specular + Ambient, Texture.a);
 	} else {
-		outColor = vec4(Diffuse + Specular + Ambient, 1.0f);
+		outColor = vec4(Diffuse + Specular + Ambient + SpotLight, 1.0f);
 	}
 }

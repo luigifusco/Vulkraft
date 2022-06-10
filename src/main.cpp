@@ -107,6 +107,7 @@ struct FragmentUniformBufferObject {
     alignas(16) glm::vec3 lightCol1;
     alignas(16) glm::vec3 eyePos;
     alignas(16) glm::vec2 ambFactor;
+    alignas(16) glm::vec3 eyeDir;
 };
 
 class HelloTriangleApplication {
@@ -363,6 +364,14 @@ private:
                 std::ref(threadProcessing));
         }
 
+        if (glfwGetKey(window, GLFW_KEY_O)) {
+            sunDir = glm::vec3(0.f, 1.f, 0.f);
+        }
+
+        if (glfwGetKey(window, GLFW_KEY_I)) {
+            sunDir = glm::vec3(0.f, -1.f, 0.f);
+        }
+
         static std::unordered_set<glm::ivec3> chunkIndexesToAdd;
         glm::ivec3 baseChunkIndex = Chunk::findChunkIndex(player.getCamera().getPosition(), chunkMap);
         for (int i = -2; i <= 2; ++i) {
@@ -439,6 +448,7 @@ private:
         fubo.lightCol1 = glm::vec3(0.1f) * (1 - visibility);
         fubo.ambFactor = glm::vec2(visibility * 0.175 + (1 - visibility) * 0.025);
         fubo.eyePos = player.getCamera().getPosition();
+        fubo.eyeDir = player.getCamera().getDirection();
 
 
 		void* data;

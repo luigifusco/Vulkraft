@@ -30,6 +30,7 @@ class Camera {
         glm::vec3 getAngle();
         void updateAngle(double x , double y);
         glm::mat4 getMatrix();
+        glm::vec3 getDirection();
 
 
 };

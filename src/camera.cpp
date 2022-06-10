@@ -49,3 +49,10 @@ void Camera::updateDirection(){
                 glm::mat3(glm::rotate(glm::mat4(1.0f), CamAng.x, glm::vec3(1.0f, 0.0f, 0.0f))) *
                 glm::mat3(glm::rotate(glm::mat4(1.0f), CamAng.z, glm::vec3(0.0f, 0.0f, 1.0f)));
 }
+
+glm::vec3 Camera::getDirection() {
+    return glm::vec3(
+        glm::rotate(glm::mat4(1), CamAng.y, glm::vec3(0.f, 1.f, 0.f)) *
+        glm::rotate(glm::mat4(1), CamAng.x, glm::vec3(1.f, 0.f, 0.f)) *
+        glm::vec4(0.f, 0.f, 1.f, 1.f));
+}
