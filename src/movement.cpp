@@ -75,7 +75,7 @@ Movement::CollisionResponseT Movement::resolveCollision(const glm::vec3& positio
             finalPos += collisionResponse.position;
             collisionResponse = Movement::canMove(finalPos, chunkMap);
             if (failureCheck++ == 100) {
-                finalPos.y = 150;
+                finalPos.y = 300;
             }
         }
     }
