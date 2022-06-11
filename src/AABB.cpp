@@ -44,7 +44,7 @@ PlayerAABB::PlayerAABB(): AABB({
      glm::vec3(0.4, -1.5, -0.4),
      glm::vec3(-0.4, -1.5, 0.4),
      glm::vec3(-0.4, -1.5, -0.4),
-  } , 0.4 , 1.8, 0.4){}
+  } , 0.8 , 1.8, 0.8){}
 
 BlockAABB::BlockAABB(glm::vec3 blockPosition) : AABB(blockPosition , 1.0) {}
 
@@ -102,32 +102,6 @@ glm::vec3 AABB::getPopOut(AABB& aabb) {
     }
 
     return mv;
-}
-
-glm::vec3 AABB::getDistanceTo(AABB aabb){
-  glm::vec3 distance(0);
-
-  if (getMaxX() < aabb.getMinX()){
-      distance.x = aabb.getMinX() - getMaxX();
-  }
-  else if (getMinX() > aabb.getMaxX()){
-      distance.x = getMinX() - aabb.getMaxX();
-  }
-  if (getMaxY() < aabb.getMinY()){
-      distance.y = aabb.getMinY() - getMaxY();
-  }
-  else if (getMinY() > aabb.getMaxY()){
-      distance.y = getMinY() - aabb.getMaxY();
-  }
-  if (getMaxZ() < aabb.getMinZ()){
-      distance.z = aabb.getMinZ() - getMaxZ();
-  }
-  else if (getMinZ() > aabb.getMaxZ()){
-      distance.z = getMinZ() - aabb.getMaxZ();
-  }
-
-
-  return distance;
 }
 
 

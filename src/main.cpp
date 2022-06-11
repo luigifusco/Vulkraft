@@ -450,7 +450,6 @@ private:
         fubo.eyePos = player.getCamera().getPosition();
         fubo.eyeDir = player.getCamera().getDirection();
 
-
 		void* data;
 		vkMapMemory(device, vertexUniformBuffersMemory[currentImage], 0,
 							sizeof(vubo), 0, &data);

@@ -12,7 +12,7 @@ std::vector<glm::ivec3> Movement::getPositionsToCheck(glm::vec3 position){
     for(int x = -1 ; x<2 ; x++){
         for(int y = -2 ; y<2 ; y++){
             for(int z = -1 ; z<2 ; z++){
-                positions.push_back(glm::ivec3((int)position.x +x, (int)position.y +y, (int)position.z +z));
+                positions.push_back(glm::ivec3(floor(position.x) +x, floor(position.y) +y, floor(position.z) +z));
             }
         }
     }

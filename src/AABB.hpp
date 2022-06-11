@@ -30,9 +30,6 @@ struct AABB {
         float getMaxZ() {return getMaxAt(2);};
 
         glm::vec3 getPopOut(AABB& aabb);
-
-        glm::vec3 getDistanceTo(AABB aabb);
-
 };
 
 
