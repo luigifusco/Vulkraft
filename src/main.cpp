@@ -374,8 +374,9 @@ private:
 
         static std::unordered_set<glm::ivec3> chunkIndexesToAdd;
         glm::ivec3 baseChunkIndex = Chunk::findChunkIndex(player.getCamera().getPosition(), chunkMap);
-        for (int i = -2; i <= 2; ++i) {
-            for (int j = -2; j <= 2; ++j) {
+        const int CHUNK_RANGE = 2;
+        for (int i = -CHUNK_RANGE; i <= CHUNK_RANGE; ++i) {
+            for (int j = -CHUNK_RANGE; j <= CHUNK_RANGE; ++j) {
                 glm::ivec3 curChunkIndex(baseChunkIndex.x + i * CHUNK_WIDTH, baseChunkIndex.y, baseChunkIndex.z + j * CHUNK_DEPTH);
                 if (chunkMap.find(curChunkIndex) == chunkMap.end()) {
                     if (chunkIndexesToAdd.find(curChunkIndex) == chunkIndexesToAdd.end()) {
@@ -390,7 +391,7 @@ private:
             }
         }
 
-        bool shouldRedraw = false;
+        static bool shouldRedraw = false;
 
         if (oldChunkIndex != baseChunkIndex) {
             oldChunkIndex = baseChunkIndex;
@@ -407,21 +408,20 @@ private:
                         outQ.pop();
                     }
                 }
-                shouldRedraw = !newChunks.empty();
+                if (!newChunks.empty()) shouldRedraw = true;
                 for (auto& iter : newChunks) {
                     chunkIndexesToAdd.erase(chunkIndexesToAdd.find(iter));
                 }
             }
         }
-        if (shouldRedraw) {
-            if (shouldRedraw) {
-                drawVisibleChunks();
-            }
+        if (shouldRedraw && !threadProcessing) {
+            drawVisibleChunks();
             if (vertices.size()) {
                 curBuffer = (curBuffer + 1) % MAX_FRAMES_IN_FLIGHT;
                 updateVertexBuffer();
                 updateIndexBuffer();
             }
+            shouldRedraw = false;
         }
 
         sunDir = (glm::rotate(glm::mat4(1.0f), SUN_SPEED, glm::vec3(1, 0, 0)) * glm::vec4(sunDir, 1.0f));
@@ -449,6 +449,8 @@ private:
         fubo.ambFactor = glm::vec2(visibility * 0.175 + (1 - visibility) * 0.025);
         fubo.eyePos = player.getCamera().getPosition();
         fubo.eyeDir = player.getCamera().getDirection();
+
+        //std::cout << fubo.eyePos.x << ",\t" << fubo.eyePos.y << ",\t" << fubo.eyePos.z << std::endl;
 
 		void* data;
 		vkMapMemory(device, vertexUniformBuffersMemory[currentImage], 0,
@@ -502,18 +504,18 @@ private:
         {
             std::unique_lock l(mapM);
             const glm::ivec3 baseChunkIndex = Chunk::findChunkIndex(player.getCamera().getPosition(), chunkMap);
-            for (auto& iter : chunkMap) {
-                if (
-                    iter.first.x <= baseChunkIndex.x + CHUNK_WIDTH * VIEW_RANGE &&
-                    iter.first.x >= baseChunkIndex.x - CHUNK_WIDTH * VIEW_RANGE &&
-                    iter.first.z <= baseChunkIndex.z + CHUNK_DEPTH * VIEW_RANGE &&
-                    iter.first.z >= baseChunkIndex.z - CHUNK_DEPTH * VIEW_RANGE) {
-                visibleChunks.push_back(iter.second);
+            for (int i = -VIEW_RANGE; i <= VIEW_RANGE; ++i) {
+                for (int j = -VIEW_RANGE; j <= VIEW_RANGE; ++j) {
+                    glm::ivec3 curChunkIndex(baseChunkIndex.x + i * CHUNK_WIDTH, baseChunkIndex.y, baseChunkIndex.z + j * CHUNK_DEPTH);
+                    auto iter = chunkMap.find(curChunkIndex);
+                    if (iter != chunkMap.end()) {
+                        visibleChunks.push_back(iter->second);
+                    }
                 }
             }
-        }
-        for (auto& iter : visibleChunks) {
-            drawChunk(iter);
+            for (auto& iter : visibleChunks) {
+                drawChunk(iter);
+            }
         }
     }
 

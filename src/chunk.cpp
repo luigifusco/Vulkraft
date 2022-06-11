@@ -194,19 +194,19 @@ void Chunk::buildStructure(StructureMeta* meta) {
 }
 
 int Chunk::sampleHeight(int x, int z, float depth) {
-    static const int octaves = 20;
-    int minY = 16 * depth;
-    float varY = 30.0 * depth;
+    static const int octaves = 8;
+    int minY = 8;
+    float varY = 240. * depth;
 
-    float dx = (float)(x + coordinates.x) / CHUNK_WIDTH;
-    float dz = (float)(z + coordinates.z) / CHUNK_DEPTH;
+    float dx = (float)(x + coordinates.x) / (100.);
+    float dz = (float)(z + coordinates.z) / (100.);
     
-    const float noise = varY * perlin.normalizedOctave3D(dx, depth, dz, octaves);
+    const float noise = varY * perlin.normalizedOctave2D_01(dx, dz, octaves);
     return std::clamp(minY + (int)noise, 0, CHUNK_HEIGHT - 1);
 }
 
 void Chunk::initTerrain() {
-    static const int waterLevel = 12;
+    static const int waterLevel = 100;
 
     for (int x = 0; x < CHUNK_WIDTH; ++x) {
         for (int z = 0; z < CHUNK_DEPTH; ++z) {
@@ -234,13 +234,14 @@ void Chunk::initTerrain() {
 void Chunk::initPlants() {
     for (int x = 2; x < CHUNK_WIDTH - 2; ++x) {
         for (int z = 2; z < CHUNK_DEPTH - 2; ++z) {
-            double noise = perlin.normalizedOctave2D(x, z, 80);
+            double noise = (float)rand() / (float)RAND_MAX;
+            noise = noise * 2 - 1;
             int y = sampleHeight(x, z, 1.0);
-            if(noise < -0.2) {
+            if(noise < -0.95) {
                 if(blocks[x][y][z].type == (BlockType*) GRASS) {
                     blocks[x][y + 1][z].type = (BlockType*) BUSH;
                 }
-            } else if(noise > 0.3) {
+            } else if(noise > 0.95) {
                 if(blocks[x][y][z].type == (BlockType*) GRASS) {
                     glm::ivec3 base(x, y + 1, z);
                     StructureMeta meta;
@@ -305,12 +306,16 @@ std::vector<std::pair<glm::ivec3, Chunk*>> Chunk::getNeighbors() {
     const int xOff[] = { CHUNK_WIDTH, -CHUNK_WIDTH };
     const int zOff[] = {CHUNK_DEPTH, -CHUNK_DEPTH};
     for (int i = 0; i < 2; ++i) {
-        for (int j = 0; j < 2; ++j) {
-            glm::ivec3 newVec = coordinates + glm::ivec3(xOff[i], 0, zOff[j]);
-            auto iter = chunkMap.find(newVec);
-            if (iter != chunkMap.end())
-                neighbors.push_back(*iter);
-        }
+        glm::ivec3 newVec = coordinates + glm::ivec3(xOff[i], 0, 0);
+        auto iter = chunkMap.find(newVec);
+        if (iter != chunkMap.end())
+            neighbors.push_back(*iter);
+    }
+    for (int i = 0; i < 2; ++i) {
+        glm::ivec3 newVec = coordinates + glm::ivec3(0, 0, zOff[i]);
+        auto iter = chunkMap.find(newVec);
+        if (iter != chunkMap.end())
+            neighbors.push_back(*iter);
     }
 
     return neighbors;
