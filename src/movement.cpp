@@ -33,7 +33,7 @@ Movement::CollisionResponseT Movement::canMove(const glm::vec3 & endPosition, co
     }
 
     for(auto & pos : positionsToCheck){
-        auto chunkIndex = Chunk::findChunkIndex(pos , chunkMap);
+        auto chunkIndex = Chunk::findChunkIndex(pos);
         auto chunkPair = chunkMap.find(chunkIndex);
         if(chunkPair == chunkMap.end()){
             continue;

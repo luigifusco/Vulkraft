@@ -372,8 +372,48 @@ private:
             sunDir = glm::vec3(0.f, -1.f, 0.f);
         }
 
+
+
         static std::unordered_set<glm::ivec3> chunkIndexesToAdd;
-        glm::ivec3 baseChunkIndex = Chunk::findChunkIndex(player.getCamera().getPosition(), chunkMap);
+
+        static bool leftPressed = false;
+        static bool shouldRedraw = false;
+
+        if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && !leftPressed) {
+            leftPressed = true;
+            shouldRedraw = true;
+            glm::ivec3 baseChunkIndex = Chunk::findChunkIndex(player.getCamera().getPosition());
+            Chunk* chunk = chunkMap.find(baseChunkIndex)->second;
+            glm::ivec3 blockIndex = Chunk::findBlockIndex(player.getCamera().getPosition());
+            chunk->destroyTop(blockIndex.x, blockIndex.z);
+            chunkIndexesToAdd.insert(baseChunkIndex);
+            std::vector<glm::ivec3> neighbors;
+            if (blockIndex.x == 0) {
+                neighbors.push_back(baseChunkIndex - glm::ivec3(CHUNK_WIDTH, 0, 0));
+            }
+            else if (blockIndex.x == CHUNK_WIDTH - 1) {
+                neighbors.push_back(baseChunkIndex + glm::ivec3(CHUNK_WIDTH, 0, 0));
+            }
+            if (blockIndex.z == 0) {
+                neighbors.push_back(baseChunkIndex - glm::ivec3(0, 0, CHUNK_DEPTH));
+            }
+            else if (blockIndex.z == CHUNK_DEPTH - 1) {
+                neighbors.push_back(baseChunkIndex + glm::ivec3(0, 0, CHUNK_DEPTH));
+            }
+            {
+                std::unique_lock l(mapM);
+                chunk->build();
+                for (auto& index : neighbors) {
+                    auto iter = chunkMap.find(index);
+                    if (iter != chunkMap.end()) iter->second->build();
+                }
+            }
+        }
+
+        if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE) leftPressed = false;
+
+
+        glm::ivec3 baseChunkIndex = Chunk::findChunkIndex(player.getCamera().getPosition());
         const int CHUNK_RANGE = 2;
         for (int i = -CHUNK_RANGE; i <= CHUNK_RANGE; ++i) {
             for (int j = -CHUNK_RANGE; j <= CHUNK_RANGE; ++j) {
@@ -391,7 +431,6 @@ private:
             }
         }
 
-        static bool shouldRedraw = false;
 
         if (oldChunkIndex != baseChunkIndex) {
             oldChunkIndex = baseChunkIndex;
@@ -410,11 +449,12 @@ private:
                 }
                 if (!newChunks.empty()) shouldRedraw = true;
                 for (auto& iter : newChunks) {
-                    chunkIndexesToAdd.erase(chunkIndexesToAdd.find(iter));
+                    auto toErase = chunkIndexesToAdd.find(iter);
+                    if (toErase != chunkIndexesToAdd.end()) chunkIndexesToAdd.erase(toErase);
                 }
             }
         }
-        if (shouldRedraw && !threadProcessing) {
+        if (shouldRedraw) {
             drawVisibleChunks();
             if (vertices.size()) {
                 curBuffer = (curBuffer + 1) % MAX_FRAMES_IN_FLIGHT;
@@ -429,7 +469,7 @@ private:
 					
 		glm::mat4 Prj = glm::perspective(glm::radians(80.0f),
 						swapChainExtent.width / (float) swapChainExtent.height,
-						0.1f, 128.0f);
+						0.1f, 200.0f);
 		Prj[1][1] *= -1;
 	
 		// updates global uniforms
@@ -503,7 +543,7 @@ private:
         const int VIEW_RANGE = 2;
         {
             std::unique_lock l(mapM);
-            const glm::ivec3 baseChunkIndex = Chunk::findChunkIndex(player.getCamera().getPosition(), chunkMap);
+            const glm::ivec3 baseChunkIndex = Chunk::findChunkIndex(player.getCamera().getPosition());
             for (int i = -VIEW_RANGE; i <= VIEW_RANGE; ++i) {
                 for (int j = -VIEW_RANGE; j <= VIEW_RANGE; ++j) {
                     glm::ivec3 curChunkIndex(baseChunkIndex.x + i * CHUNK_WIDTH, baseChunkIndex.y, baseChunkIndex.z + j * CHUNK_DEPTH);

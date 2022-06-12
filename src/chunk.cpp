@@ -356,23 +356,21 @@ void chunkGeneratorFunction(
         for (auto& curPos : toBuild) {
             auto iter = chunkMap.find(curPos);
             Chunk* newChunk;
+            threadProcessing = true;
             if (iter == chunkMap.end()) { // build new chunk
-                threadProcessing = true;
                 newChunk = new Chunk(curPos, chunkMap);
-                chunksToBuild.insert(newChunk);
-                {
-                    std::unique_lock l(mapM);
-                    chunkMap.insert(std::pair(curPos, newChunk));
-                }
-                std::vector<std::pair<glm::ivec3, Chunk*>> neighbors = newChunk->getNeighbors();
-                for (auto& c : neighbors) {
-                    chunksToBuild.insert(c.second);
-                }
+                std::unique_lock l(mapM);
+                chunkMap.insert(std::pair(curPos, newChunk));
             }
             else { // rebuild chunk
                 newChunk = iter->second;
-                newChunk->build();
             }
+            chunksToBuild.insert(newChunk);
+            std::vector<std::pair<glm::ivec3, Chunk*>> neighbors = newChunk->getNeighbors();
+            for (auto& c : neighbors) {
+                chunksToBuild.insert(c.second);
+            }
+
         }
 
         for (auto& c : chunksToBuild) {
@@ -412,7 +410,21 @@ bool Chunk::isBlockVisible(glm::ivec3 position){
 }
 
 
-glm::ivec3 Chunk::findChunkIndex(glm::vec3 position, const std::unordered_map<glm::ivec3, Chunk*> & chunkMap ) {
-        return glm::vec3((int) floor(position.x / (float)CHUNK_WIDTH) * CHUNK_WIDTH, 0, (int) floor(position.z / (float)CHUNK_DEPTH) * CHUNK_DEPTH);
+glm::ivec3 Chunk::findChunkIndex(glm::vec3 position) {
+        return glm::ivec3((int) floor(position.x / (float)CHUNK_WIDTH) * CHUNK_WIDTH, 0, (int) floor(position.z / (float)CHUNK_DEPTH) * CHUNK_DEPTH);
+}
+
+glm::ivec3 Chunk::findBlockIndex(glm::vec3 position) {
+    glm::ivec3 chunkIndex = Chunk::findChunkIndex(position);
+    return glm::ivec3(floor(position.x - chunkIndex.x), floor(position.y), floor(position.z - chunkIndex.z));
+}
+
+void Chunk::destroyTop(int x, int z) {
+    for (int y = CHUNK_HEIGHT - 1; y > 1; --y) {
+        if (blocks[x][y][z].type != AIR) {
+            blocks[x][y][z].type = (BlockType*) AIR;
+            return;
+        }
+    }
 }
  

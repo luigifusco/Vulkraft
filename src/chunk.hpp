@@ -104,7 +104,10 @@ class Chunk {
 
 		std::vector<glm::ivec3> getBlockPositions();
 
-		static glm::ivec3 findChunkIndex(glm::vec3 position, const std::unordered_map<glm::ivec3, Chunk*> & chunkMap );
+		void destroyTop(int x, int z);
+
+		static glm::ivec3 findChunkIndex(glm::vec3 position);
+		static glm::ivec3 findBlockIndex(glm::vec3 position);
 
 		void clear();
 
