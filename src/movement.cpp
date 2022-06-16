@@ -40,7 +40,7 @@ Movement::CollisionResponseT Movement::canMove(const glm::vec3 & endPosition, co
         }
         auto chunk = chunkPair->second;
 
-        if(chunk->isBlockVisible(pos)){
+        if(chunk->isBlockSolidGlobal(pos)){
             BlockAABB block{pos};
 
             if(playerBox.intersect(block)){ // save only biggest compenetration

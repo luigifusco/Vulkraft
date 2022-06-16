@@ -401,14 +401,15 @@ std::vector<glm::ivec3> Chunk::getBlockPositions(){
 
 }
 
-bool Chunk::isBlockVisible(glm::ivec3 position){
-    // std::cout << position.x << " " << position.y << " " << position.z << std::endl;
-    position -= coordinates;
+bool Chunk::isBlockSolidLocal(glm::ivec3 position){
     if(position.y >= CHUNK_HEIGHT) return false;
 
     return blocks[position.x][position.y][position.z].type->isSolid;
 }
 
+bool Chunk::isBlockSolidGlobal(glm::ivec3 position){
+    return isBlockSolidLocal(position - coordinates);
+}
 
 glm::ivec3 Chunk::findChunkIndex(glm::vec3 position) {
         return glm::ivec3((int) floor(position.x / (float)CHUNK_WIDTH) * CHUNK_WIDTH, 0, (int) floor(position.z / (float)CHUNK_DEPTH) * CHUNK_DEPTH);

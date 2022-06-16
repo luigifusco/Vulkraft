@@ -115,7 +115,8 @@ class Chunk {
 
 		static void setSeed(unsigned int seedIn);
 		
-		bool isBlockVisible(glm::ivec3 position);
+		bool isBlockSolidLocal(glm::ivec3 position);
+		bool isBlockSolidGlobal(glm::ivec3 position);
 };
 
 void chunkGeneratorFunction(
