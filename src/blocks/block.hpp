@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glm/glm.hpp>
+#include <string>
 #include "../utils/enums.hpp"
 
 class BlockType {
@@ -34,6 +35,8 @@ class BlockType {
         virtual glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) = 0;        
 
         glm::vec2 purge(Direction dir, glm::ivec3 coords);
+
+        virtual std::string toString() = 0;
 };
 
 class Air : public BlockType {
@@ -45,6 +48,10 @@ class Air : public BlockType {
         bool isVisible() override {
             return false;
         }
+
+        std::string toString() override {
+            return "Air";
+        }
 };
 
 class Dirt : public BlockType {
@@ -52,6 +59,10 @@ class Dirt : public BlockType {
         Dirt() : BlockType(true, true) {};
 
         glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
+
+        std::string toString() override {
+            return "Dirt";
+        }
 };
 
 class Grass : public BlockType {
@@ -59,6 +70,10 @@ class Grass : public BlockType {
         Grass() : BlockType(true, true) {};
 
         glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
+
+        std::string toString() override {
+            return "Grass";
+        }
 };
 
 class WoodLog : public BlockType {
@@ -66,6 +81,10 @@ class WoodLog : public BlockType {
         WoodLog() : BlockType(true, true) {};
 
         glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
+
+        std::string toString() override {
+            return "WoodLog";
+        }
 };
 
 class WoodPlank : public BlockType {
@@ -73,6 +92,10 @@ class WoodPlank : public BlockType {
         WoodPlank() : BlockType(true, true) {};
 
         glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
+
+        std::string toString() override {
+            return "WoodPlank";
+        }
 };
 
 class Stone : public BlockType {
@@ -80,6 +103,10 @@ class Stone : public BlockType {
         Stone() : BlockType(true, true) {};
 
         glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
+
+        std::string toString() override {
+            return "Stone";
+        }
 };
 
 class Cobblestone : public BlockType {
@@ -87,6 +114,10 @@ class Cobblestone : public BlockType {
         Cobblestone() : BlockType(true, true) {};
 
         glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
+
+        std::string toString() override {
+            return "Cobblestone";
+        }
 };
 
 class Sand : public BlockType {
@@ -94,6 +125,10 @@ class Sand : public BlockType {
         Sand() : BlockType(true, true) {};
 
         glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
+
+        std::string toString() override {
+            return "Sand";
+        }
 };
 
 class Gravel : public BlockType {
@@ -101,6 +136,10 @@ class Gravel : public BlockType {
         Gravel() : BlockType(true, true) {};
 
         glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
+
+        std::string toString() override {
+            return "Gravel";
+        }
 };
 
 class Bedrock : public BlockType {
@@ -108,6 +147,10 @@ class Bedrock : public BlockType {
         Bedrock() : BlockType(true, true) {};
 
         glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
+
+        std::string toString() override {
+            return "Bedrock";
+        }
 };
 
 class Leaves : public BlockType {
@@ -115,6 +158,10 @@ class Leaves : public BlockType {
         Leaves() : BlockType(true, false) {};
 
         glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
+
+        std::string toString() override {
+            return "Leaves";
+        }
 };
 
 class Water : public BlockType {
@@ -134,6 +181,10 @@ class Water : public BlockType {
         }
 
         glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
+
+        std::string toString() override {
+            return "Water";
+        }
 };
 
 class Bush : public BlockType {
@@ -145,6 +196,10 @@ class Bush : public BlockType {
         }
 
         glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
+
+        std::string toString() override {
+            return "Bush";
+        }
 };
 
 /* singleton block definition */
