@@ -189,7 +189,7 @@ class Water : public BlockType {
 
 class Bush : public BlockType {
     public:
-        Bush() : BlockType(false, false) {};
+        Bush() : BlockType(true, false) {};
 
         bool isDiagonal() override {
             return true;
