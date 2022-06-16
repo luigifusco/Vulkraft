@@ -174,6 +174,21 @@ void Chunk::buildBlockFace(int x, int y, int z, Direction dir, bool opaqueOnly) 
         waterIndices.push_back(index + 0);
         waterIndices.push_back(index + 2);
         waterIndices.push_back(index + 3);
+        
+        // Draw the face also in the opposite direction to avoid culling
+        // (otherwise the water surface is not visible while swimming)
+        index = waterVertices.size();
+        waterVertices.push_back({ pos + face->a, face->norm, block.type->getTextureOffset(dir, face->a), mat });
+        waterVertices.push_back({ pos + face->b, face->norm, block.type->getTextureOffset(dir, face->b), mat });
+        waterVertices.push_back({ pos + face->c, face->norm, block.type->getTextureOffset(dir, face->c), mat });
+        waterVertices.push_back({ pos + face->d, face->norm, block.type->getTextureOffset(dir, face->d), mat });
+
+        waterIndices.push_back(index + 0);
+        waterIndices.push_back(index + 2);
+        waterIndices.push_back(index + 1);
+        waterIndices.push_back(index + 0);
+        waterIndices.push_back(index + 3);
+        waterIndices.push_back(index + 2);
     }
 }
 
