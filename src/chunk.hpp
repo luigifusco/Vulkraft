@@ -122,6 +122,8 @@ class Chunk {
 
 		bool isBlockWaterLocal(glm::ivec3 position);
 		bool isBlockWaterGlobal(glm::ivec3 position);
+
+		void spreadWater(glm::ivec3 position);
 };
 
 void chunkGeneratorFunction(

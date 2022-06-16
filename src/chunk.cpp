@@ -453,3 +453,7 @@ bool Chunk::isBlockWaterLocal(glm::ivec3 position) {
 bool Chunk::isBlockWaterGlobal(glm::ivec3 position) {
     return isBlockWaterLocal(position - coordinates);
 }
+
+void Chunk::spreadWater(glm::ivec3 position) {
+    blocks[position.x][position.y][position.z].type = (BlockType*) WATER;
+}

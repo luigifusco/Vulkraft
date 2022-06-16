@@ -397,17 +397,54 @@ private:
                 if(chunk->destroyLocal(blockIndex)) {   
                     chunkIndexesToAdd.insert(baseChunkIndex);
                     std::vector<glm::ivec3> neighbors;
-                    if (blockIndex.x == 0) {
-                        neighbors.push_back(baseChunkIndex - glm::ivec3(CHUNK_WIDTH, 0, 0));
+                    bool checkWaterSpread = true;
+                    if (chunk->isBlockWaterLocal(target + glm::ivec3(0, 1, 0))) {
+                        chunk->spreadWater(target);
+                        checkWaterSpread = false;
                     }
-                    else if (blockIndex.x == CHUNK_WIDTH - 1) {
-                        neighbors.push_back(baseChunkIndex + glm::ivec3(CHUNK_WIDTH, 0, 0));
+                    if (blockIndex.x == 0) {
+                        glm::ivec3 nearChunkIndex = baseChunkIndex - glm::ivec3(CHUNK_WIDTH, 0, 0);
+                        neighbors.push_back(nearChunkIndex);
+                        Chunk* neighbor = chunkMap.find(nearChunkIndex)->second;
+                        if (checkWaterSpread && (chunk->isBlockWaterLocal(target + glm::ivec3(1, 0, 0)) || neighbor->isBlockWaterLocal(target - glm::ivec3(1, 0, 0)))) {
+                            chunk->spreadWater(target);
+                            checkWaterSpread = false;
+                        }
+                    } else if (blockIndex.x == CHUNK_WIDTH - 1) {
+                        glm::ivec3 nearChunkIndex = baseChunkIndex + glm::ivec3(CHUNK_WIDTH, 0, 0);
+                        neighbors.push_back(nearChunkIndex);
+                        Chunk* neighbor = chunkMap.find(nearChunkIndex)->second;
+                        if (checkWaterSpread && (neighbor->isBlockWaterLocal(target + glm::ivec3(1, 0, 0)) || chunk->isBlockWaterLocal(target - glm::ivec3(1, 0, 0)))) {
+                            chunk->spreadWater(target);
+                            checkWaterSpread = false;
+                        }
+                    } else {
+                        if (checkWaterSpread && (chunk->isBlockWaterLocal(target + glm::ivec3(1, 0, 0)) || chunk->isBlockWaterLocal(target - glm::ivec3(1, 0, 0)))) {
+                            chunk->spreadWater(target);
+                            checkWaterSpread = false;
+                        }
                     }
                     if (blockIndex.z == 0) {
-                        neighbors.push_back(baseChunkIndex - glm::ivec3(0, 0, CHUNK_DEPTH));
-                    }
-                    else if (blockIndex.z == CHUNK_DEPTH - 1) {
-                        neighbors.push_back(baseChunkIndex + glm::ivec3(0, 0, CHUNK_DEPTH));
+                        glm::ivec3 nearChunkIndex = baseChunkIndex - glm::ivec3(0, 0, CHUNK_DEPTH);
+                        neighbors.push_back(nearChunkIndex);
+                        Chunk* neighbor = chunkMap.find(nearChunkIndex)->second;
+                        if (checkWaterSpread && (chunk->isBlockWaterLocal(target + glm::ivec3(0, 0, 1)) || neighbor->isBlockWaterLocal(target - glm::ivec3(0, 0, 1)))) {
+                            chunk->spreadWater(target);
+                            checkWaterSpread = false;
+                        }
+                    } else if (blockIndex.z == CHUNK_DEPTH - 1) {
+                        glm::ivec3 nearChunkIndex = baseChunkIndex + glm::ivec3(0, 0, CHUNK_DEPTH);
+                        neighbors.push_back(nearChunkIndex);
+                        Chunk* neighbor = chunkMap.find(nearChunkIndex)->second;
+                        if (checkWaterSpread && (neighbor->isBlockWaterLocal(target + glm::ivec3(0, 0, 1)) || chunk->isBlockWaterLocal(target - glm::ivec3(0, 0, 1)))) {
+                            chunk->spreadWater(target);
+                            checkWaterSpread = false;
+                        }
+                    } else {
+                        if (checkWaterSpread && (chunk->isBlockWaterLocal(target + glm::ivec3(0, 0, 1)) || chunk->isBlockWaterLocal(target - glm::ivec3(0, 0, 1)))) {
+                            chunk->spreadWater(target);
+                            checkWaterSpread = false;
+                        }
                     }
                     {
                         std::unique_lock l(mapM);
