@@ -206,8 +206,6 @@ int Chunk::sampleHeight(int x, int z, float depth) {
 }
 
 void Chunk::initTerrain() {
-    static const int waterLevel = 100;
-
     for (int x = 0; x < CHUNK_WIDTH; ++x) {
         for (int z = 0; z < CHUNK_DEPTH; ++z) {
             blocks[x][0][z].type = (BlockType*) BEDROCK;
@@ -219,12 +217,12 @@ void Chunk::initTerrain() {
             for (int y = midY; y < maxY; ++y) {
                 blocks[x][y][z].type = (BlockType*) DIRT;
             }
-            if(maxY < waterLevel) {
+            if(maxY < WATER_LEVEL) {
                 blocks[x][maxY][z].type = (BlockType*) SAND;
             } else {
                 blocks[x][maxY][z].type = (BlockType*) GRASS;
             }
-            for(int y = maxY + 1; y <= waterLevel; ++y) {
+            for(int y = maxY + 1; y <= WATER_LEVEL; ++y) {
                 blocks[x][y][z].type = (BlockType*) WATER;
             }
         }

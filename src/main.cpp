@@ -106,7 +106,7 @@ struct FragmentUniformBufferObject {
     alignas(16) glm::vec3 lightDir1;
     alignas(16) glm::vec3 lightCol1;
     alignas(16) glm::vec3 eyePos;
-    alignas(16) glm::vec2 ambFactor;
+    alignas(16) glm::vec2 ambient;
     alignas(16) glm::vec3 eyeDir;
 };
 
@@ -486,8 +486,9 @@ private:
         fubo.lightCol0 = glm::vec3(0.8f) * visibility;
         fubo.lightDir1 = sunDir * -1.0f;
         fubo.lightCol1 = glm::vec3(0.1f) * (1 - visibility);
-        fubo.ambFactor = glm::vec2(visibility * 0.175 + (1 - visibility) * 0.025);
         fubo.eyePos = player.getCamera().getPosition();
+        fubo.ambient.x = visibility * 0.175 + (1 - visibility) * 0.025;
+        fubo.ambient.y = floor(fubo.eyePos.y) <= WATER_LEVEL ? 1.0 : 0.0;
         fubo.eyeDir = player.getCamera().getDirection();
 
         //std::cout << fubo.eyePos.x << ",\t" << fubo.eyePos.y << ",\t" << fubo.eyePos.z << std::endl;

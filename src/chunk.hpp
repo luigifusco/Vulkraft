@@ -17,6 +17,7 @@
 const int CHUNK_HEIGHT = 256;
 const int CHUNK_WIDTH = 64;
 const int CHUNK_DEPTH = 64;
+const int WATER_LEVEL = 100;
 const bool SHOW_CHUNK_BORDER = false;
 
 
