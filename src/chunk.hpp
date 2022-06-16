@@ -117,6 +117,9 @@ class Chunk {
 		static void setSeed(unsigned int seedIn);
 		
 		bool isBlockVisible(glm::ivec3 position);
+
+		bool isBlockWaterLocal(glm::ivec3 position);
+		bool isBlockWaterGlobal(glm::ivec3 position);
 };
 
 void chunkGeneratorFunction(

@@ -14,9 +14,11 @@ class Player {
         Camera& camera;
         std::unordered_map<glm::ivec3, Chunk*>& chunkMap;
         float speed = 5.0f;
-        int flying = 0;
+        bool flying = false;
+        bool swimming = false;
         const float NORMAL_SPEED = 5.0f;
         const float FLYING_SPEED = 50.f;
+        const float SWIMMING_SPEED = 4.0f;
         bool collision =  true;
         bool gravity = true;
         bool canJump = false;
@@ -24,9 +26,9 @@ class Player {
         const float jumpFactor = gravityFactor;
         glm::vec3 gravityVector{0};
         std::unordered_set<glm::vec3> movements;
-        
-    private:
+
         void update(float deltaT);
+        void updateSpeed();
 
     public:
         Player(Camera &_camera , std::unordered_map<glm::ivec3, Chunk*>& chunkMap);
@@ -34,10 +36,11 @@ class Player {
 
         Camera getCamera();
 
-
         void keyEventListener(GLFWwindow* window , float deltaT);
         void cursorPositionEventListener(GLFWwindow* window);
         void updatePhysics();
 
-
+        bool isSwimming() { 
+            return swimming; 
+        }
 };

@@ -425,4 +425,13 @@ void Chunk::destroyTop(int x, int z) {
         }
     }
 }
- 
+
+bool Chunk::isBlockWaterLocal(glm::ivec3 position) {
+    if(position.y >= CHUNK_HEIGHT) return false;
+
+    return blocks[position.x][position.y][position.z].type == WATER;
+}
+
+bool Chunk::isBlockWaterGlobal(glm::ivec3 position) {
+    return isBlockWaterLocal(position - coordinates);
+}
