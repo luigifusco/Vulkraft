@@ -1,7 +1,8 @@
 #include "trace-ray.hpp"
 #include <iostream>
 
-bool TraceRay::trace(TraceRayCallback callback, glm::ivec3 origin, glm::vec3 direction, int limit, glm::ivec3 &hitPos, glm::vec3 &hitNorm) {
+bool TraceRay::trace(TraceRayCallback callback, glm::vec3 origin, glm::vec3 direction, int limit, glm::ivec3 &hitPos, glm::vec3 &hitNorm) {
+    origin = glm::floor(origin);
     direction = glm::normalize(direction);
 
     double t = 0.0;
@@ -45,6 +46,7 @@ bool TraceRay::trace(TraceRayCallback callback, glm::ivec3 origin, glm::vec3 dir
             hitNorm.x = steppedIndex == 0 ? -stepX : 0;
             hitNorm.y = steppedIndex == 1 ? -stepY : 0;
             hitNorm.z = steppedIndex == 2 ? -stepZ : 0;
+            // std::cout << std::endl;
             // std::cout << "HIT: " << std::endl;
             // std::cout << hitPos.x << ", " << hitPos.y << ", " << hitPos.z << std::endl;
             // std::cout << hitNorm.x << ", " << hitNorm.y << ", " << hitNorm.z << std::endl << std::endl;

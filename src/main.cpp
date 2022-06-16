@@ -377,7 +377,7 @@ private:
             shouldRedraw = true;
 
             Camera camera = player.getCamera();
-            glm::ivec3 position = camera.getPosition();
+            glm::vec3 position = camera.getPosition();
             glm::vec3 direction = camera.getDirection() * -1.f;
             glm::ivec3 target;
             glm::vec3 norm;
@@ -502,7 +502,7 @@ private:
         fubo.ambient.y = player.isSwimming();
         fubo.eyeDir = player.getCamera().getDirection();
 
-        //std::cout << fubo.eyePos.x << ",\t" << fubo.eyePos.y << ",\t" << fubo.eyePos.z << std::endl;
+        // std::cout << fubo.eyePos.x << ",\t" << fubo.eyePos.y << ",\t" << fubo.eyePos.z << std::endl;
 
 		void* data;
 		vkMapMemory(device, vertexUniformBuffersMemory[currentImage], 0,
