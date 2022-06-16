@@ -382,30 +382,42 @@ private:
         if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && !leftPressed) {
             leftPressed = true;
             shouldRedraw = true;
-            glm::ivec3 baseChunkIndex = Chunk::findChunkIndex(player.getCamera().getPosition());
+
+            Camera camera = player.getCamera();
+            glm::vec3 position = camera.getPosition();
+            glm::vec3 direction = camera.getDirection() * -1.f;
+
+            glm::vec3 target = position - glm::vec3(0, 2, 0);
+
+            glm::ivec3 baseChunkIndex = Chunk::findChunkIndex(target);
             Chunk* chunk = chunkMap.find(baseChunkIndex)->second;
-            glm::ivec3 blockIndex = Chunk::findBlockIndex(player.getCamera().getPosition());
-            chunk->destroyTop(blockIndex.x, blockIndex.z);
-            chunkIndexesToAdd.insert(baseChunkIndex);
-            std::vector<glm::ivec3> neighbors;
-            if (blockIndex.x == 0) {
-                neighbors.push_back(baseChunkIndex - glm::ivec3(CHUNK_WIDTH, 0, 0));
-            }
-            else if (blockIndex.x == CHUNK_WIDTH - 1) {
-                neighbors.push_back(baseChunkIndex + glm::ivec3(CHUNK_WIDTH, 0, 0));
-            }
-            if (blockIndex.z == 0) {
-                neighbors.push_back(baseChunkIndex - glm::ivec3(0, 0, CHUNK_DEPTH));
-            }
-            else if (blockIndex.z == CHUNK_DEPTH - 1) {
-                neighbors.push_back(baseChunkIndex + glm::ivec3(0, 0, CHUNK_DEPTH));
-            }
-            {
-                std::unique_lock l(mapM);
-                chunk->build();
-                for (auto& index : neighbors) {
-                    auto iter = chunkMap.find(index);
-                    if (iter != chunkMap.end()) iter->second->build();
+            glm::ivec3 blockIndex = Chunk::findBlockIndex(target);
+
+            bool hit = chunk->destroyLocal(blockIndex);
+            std::cout << "HIT: " << hit << std::endl;
+
+            if(hit) {   
+                chunkIndexesToAdd.insert(baseChunkIndex);
+                std::vector<glm::ivec3> neighbors;
+                if (blockIndex.x == 0) {
+                    neighbors.push_back(baseChunkIndex - glm::ivec3(CHUNK_WIDTH, 0, 0));
+                }
+                else if (blockIndex.x == CHUNK_WIDTH - 1) {
+                    neighbors.push_back(baseChunkIndex + glm::ivec3(CHUNK_WIDTH, 0, 0));
+                }
+                if (blockIndex.z == 0) {
+                    neighbors.push_back(baseChunkIndex - glm::ivec3(0, 0, CHUNK_DEPTH));
+                }
+                else if (blockIndex.z == CHUNK_DEPTH - 1) {
+                    neighbors.push_back(baseChunkIndex + glm::ivec3(0, 0, CHUNK_DEPTH));
+                }
+                {
+                    std::unique_lock l(mapM);
+                    chunk->build();
+                    for (auto& index : neighbors) {
+                        auto iter = chunkMap.find(index);
+                        if (iter != chunkMap.end()) iter->second->build();
+                    }
                 }
             }
         }

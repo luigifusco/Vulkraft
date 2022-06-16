@@ -420,12 +420,14 @@ glm::ivec3 Chunk::findBlockIndex(glm::vec3 position) {
     return glm::ivec3(floor(position.x - chunkIndex.x), floor(position.y), floor(position.z - chunkIndex.z));
 }
 
-void Chunk::destroyTop(int x, int z) {
-    for (int y = CHUNK_HEIGHT - 1; y > 1; --y) {
-        if (blocks[x][y][z].type != AIR) {
-            blocks[x][y][z].type = (BlockType*) AIR;
-            return;
-        }
-    }
+bool Chunk::destroyLocal(glm::ivec3 position) {
+    Block* block = &blocks[position.x][position.y][position.z];
+    if(block->type == AIR) return false;
+    block->type = (BlockType*) STONE;
+    return true;
+}
+
+bool Chunk::destroyGlobal(glm::ivec3 position) {
+    return destroyLocal(position - coordinates);
 }
  

@@ -104,7 +104,8 @@ class Chunk {
 
 		std::vector<glm::ivec3> getBlockPositions();
 
-		void destroyTop(int x, int z);
+		bool destroyLocal(glm::ivec3 position);
+		bool destroyGlobal(glm::ivec3 position);
 
 		static glm::ivec3 findChunkIndex(glm::vec3 position);
 		static glm::ivec3 findBlockIndex(glm::vec3 position);
