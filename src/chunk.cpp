@@ -422,7 +422,7 @@ glm::ivec3 Chunk::findBlockIndex(glm::vec3 position) {
 
 bool Chunk::destroyLocal(glm::ivec3 position) {
     Block* block = &blocks[position.x][position.y][position.z];
-    if(block->type == AIR) return false;
+    if(!block->type->isSolid) return false;
     block->type = (BlockType*) STONE;
     return true;
 }
