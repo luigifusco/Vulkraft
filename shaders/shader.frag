@@ -6,7 +6,7 @@ layout(binding = 1) uniform FragmentUniformBufferObject {
 	vec3 lightDir1;
 	vec3 lightCol1;
 	vec3 eyePos;
-	vec2 ambFactor;
+	vec2 ambient;	// x: ambient light factor, y: whether in water or not
 	vec3 eyeDir;
 } ubo;
 layout(binding = 2) uniform sampler2D texSampler;
@@ -70,7 +70,7 @@ void main() {
 	Specular += Phong_Specular_BRDF(lightDir0, Norm, EyeDir, vec3(0.05), fragMaterial.z) * ubo.lightCol0;
 	Specular += Phong_Specular_BRDF(lightDir1, Norm, EyeDir, vec3(0.05), fragMaterial.z) * ubo.lightCol1;
 
-	vec3 Ambient = ubo.ambFactor.x * DiffColor;
+	vec3 Ambient = ubo.ambient.x * DiffColor;
 
 	vec3 SpotLight = vec3(0);
 	if (lightDir1.y > 0) {
@@ -82,4 +82,6 @@ void main() {
 	} else {
 		outColor = vec4(Diffuse + Specular + Ambient + SpotLight, 1.0f);
 	}
+
+	if(ubo.ambient.y == 1.0) outColor *= vec4(vec3(86, 124, 251) / 255, 1);
 }

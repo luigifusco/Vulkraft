@@ -107,7 +107,7 @@ struct FragmentUniformBufferObject {
     alignas(16) glm::vec3 lightDir1;
     alignas(16) glm::vec3 lightCol1;
     alignas(16) glm::vec3 eyePos;
-    alignas(16) glm::vec2 ambFactor;
+    alignas(16) glm::vec2 ambient;
     alignas(16) glm::vec3 eyeDir;
 };
 
@@ -310,31 +310,23 @@ private:
 		lastTime = time;
 					
 		static float debounce = time;
+        bool debounced = time - debounce > 0.33;
 
-        if(glfwGetKey(window, GLFW_KEY_ESCAPE)) {
-            if(time - debounce > 0.33) {
-                toggleCursor();
-                debounce = time;
-                framebufferResized = true;
-            }
+        if(glfwGetKey(window, GLFW_KEY_ESCAPE) && debounced) {
+            toggleCursor();
+            debounce = time;
+            framebufferResized = true;
         }
 
-        const float SUN_SPEED = glm::radians(0.03f);
-
-
-
-        if(!cursorEnabled) {
+        if(!cursorEnabled && debounced) {
 			player.cursorPositionEventListener(window);
             player.keyEventListener(window , deltaT);
         }
 
-        if(glfwGetKey(window, GLFW_KEY_P)) {
-            if(time - debounce > 0.33){
-                player.updatePhysics();
-                debounce = time;
-            }
-        }
-		
+        if(glfwGetKey(window, GLFW_KEY_P) && debounced) {
+            player.updatePhysics();
+            debounce = time;
+        }		
 
         if (glfwGetKey(window, GLFW_KEY_R)) {
             vertices.clear();
@@ -450,7 +442,6 @@ private:
             }
         }
 
-
         if (oldChunkIndex != baseChunkIndex) {
             oldChunkIndex = baseChunkIndex;
             shouldRedraw = true;
@@ -483,6 +474,7 @@ private:
             shouldRedraw = false;
         }
 
+        const float SUN_SPEED = glm::radians(0.03f);
         sunDir = (glm::rotate(glm::mat4(1.0f), SUN_SPEED, glm::vec3(1, 0, 0)) * glm::vec4(sunDir, 1.0f));
 
 					
@@ -505,8 +497,9 @@ private:
         fubo.lightCol0 = glm::vec3(0.8f) * visibility;
         fubo.lightDir1 = sunDir * -1.0f;
         fubo.lightCol1 = glm::vec3(0.1f) * (1 - visibility);
-        fubo.ambFactor = glm::vec2(visibility * 0.175 + (1 - visibility) * 0.025);
         fubo.eyePos = player.getCamera().getPosition();
+        fubo.ambient.x = visibility * 0.175 + (1 - visibility) * 0.025;
+        fubo.ambient.y = player.isSwimming();
         fubo.eyeDir = player.getCamera().getDirection();
 
         //std::cout << fubo.eyePos.x << ",\t" << fubo.eyePos.y << ",\t" << fubo.eyePos.z << std::endl;

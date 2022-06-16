@@ -174,6 +174,21 @@ void Chunk::buildBlockFace(int x, int y, int z, Direction dir, bool opaqueOnly) 
         waterIndices.push_back(index + 0);
         waterIndices.push_back(index + 2);
         waterIndices.push_back(index + 3);
+        
+        // Draw the face also in the opposite direction to avoid culling
+        // (otherwise the water surface is not visible while swimming)
+        index = waterVertices.size();
+        waterVertices.push_back({ pos + face->a, face->norm, block.type->getTextureOffset(dir, face->a), mat });
+        waterVertices.push_back({ pos + face->b, face->norm, block.type->getTextureOffset(dir, face->b), mat });
+        waterVertices.push_back({ pos + face->c, face->norm, block.type->getTextureOffset(dir, face->c), mat });
+        waterVertices.push_back({ pos + face->d, face->norm, block.type->getTextureOffset(dir, face->d), mat });
+
+        waterIndices.push_back(index + 0);
+        waterIndices.push_back(index + 2);
+        waterIndices.push_back(index + 1);
+        waterIndices.push_back(index + 0);
+        waterIndices.push_back(index + 3);
+        waterIndices.push_back(index + 2);
     }
 }
 
@@ -206,8 +221,6 @@ int Chunk::sampleHeight(int x, int z, float depth) {
 }
 
 void Chunk::initTerrain() {
-    static const int waterLevel = 100;
-
     for (int x = 0; x < CHUNK_WIDTH; ++x) {
         for (int z = 0; z < CHUNK_DEPTH; ++z) {
             blocks[x][0][z].type = (BlockType*) BEDROCK;
@@ -219,12 +232,12 @@ void Chunk::initTerrain() {
             for (int y = midY; y < maxY; ++y) {
                 blocks[x][y][z].type = (BlockType*) DIRT;
             }
-            if(maxY < waterLevel) {
+            if(maxY < WATER_LEVEL) {
                 blocks[x][maxY][z].type = (BlockType*) SAND;
             } else {
                 blocks[x][maxY][z].type = (BlockType*) GRASS;
             }
-            for(int y = maxY + 1; y <= waterLevel; ++y) {
+            for(int y = maxY + 1; y <= WATER_LEVEL; ++y) {
                 blocks[x][y][z].type = (BlockType*) WATER;
             }
         }
@@ -430,4 +443,13 @@ bool Chunk::destroyLocal(glm::ivec3 position) {
 bool Chunk::destroyGlobal(glm::ivec3 position) {
     return destroyLocal(position - coordinates);
 }
- 
+
+bool Chunk::isBlockWaterLocal(glm::ivec3 position) {
+    if(position.y >= CHUNK_HEIGHT) return false;
+
+    return blocks[position.x][position.y][position.z].type == WATER;
+}
+
+bool Chunk::isBlockWaterGlobal(glm::ivec3 position) {
+    return isBlockWaterLocal(position - coordinates);
+}
