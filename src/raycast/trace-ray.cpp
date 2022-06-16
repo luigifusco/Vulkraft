@@ -2,8 +2,9 @@
 #include <iostream>
 
 bool TraceRay::trace(TraceRayCallback callback, glm::vec3 origin, glm::vec3 direction, int limit, glm::ivec3 &hitPos, glm::vec3 &hitNorm) {
-    origin = glm::floor(origin);
     direction = glm::normalize(direction);
+    
+    glm::ivec3 current = glm::floor(origin);
 
     double t = 0.0;
 
@@ -15,9 +16,13 @@ bool TraceRay::trace(TraceRayCallback callback, glm::vec3 origin, glm::vec3 dire
     double tyDelta = direction.y != 0 ? abs(1.0 / direction.y) : std::numeric_limits<double>::infinity();
     double tzDelta = direction.z != 0 ? abs(1.0 / direction.z) : std::numeric_limits<double>::infinity();
 
-    double txMax = txDelta * abs(stepX);
-    double tyMax = tyDelta * abs(stepY);
-    double tzMax = tzDelta * abs(stepZ);
+    double xDist = stepX > 0 ? current.x + 1 - origin.x : origin.x - current.x;
+    double yDist = stepY > 0 ? current.y + 1 - origin.y : origin.y - current.y;
+    double zDist = stepZ > 0 ? current.z + 1 - origin.z : origin.z - current.z;
+
+    double txMax = txDelta * abs(xDist);
+    double tyMax = tyDelta * abs(yDist);
+    double tzMax = tzDelta * abs(zDist);
 
     int steppedIndex = -1;
 
@@ -29,8 +34,6 @@ bool TraceRay::trace(TraceRayCallback callback, glm::vec3 origin, glm::vec3 dire
     // std::cout << stepX << ", " << stepY << ", " << stepZ << std::endl;
     // std::cout << txDelta << ", " << tyDelta << ", " << tzDelta << std::endl;
     // std::cout << txMax << ", " << tyMax << ", " << tzMax << std::endl << std::endl;
-
-    glm::vec3 current = glm::ivec3(origin);
 
     while(t <= limit) {
         // std::cout << "INTERSECTION:" << std::endl;

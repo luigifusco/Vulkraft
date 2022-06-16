@@ -50,6 +50,15 @@ vec3 spot_light_color(vec3 pos) {
 	return vec3(.3 * (244./255.),.3 * (252./255.),.3 * (3./255.)) * dimming * pow((1 / length(ubo.eyePos - pos)),1.f);
 }
 
+vec3 center_light(vec3 pos) {
+	// Spot light color
+	float cos_alpha = dot(normalize(ubo.eyePos - pos), ubo.eyeDir);
+	float c_in = cos(0.005f);
+	float c_out = cos(0.01f);
+	float dimming = clamp((cos_alpha - c_out) / (c_in - c_out), 0, 1);
+	return vec3(.3 * (244./255.),.3 * (252./255.),.3 * (3./255.)) * dimming * pow((1 / length(ubo.eyePos - pos)),1.f);
+}
+
 void main() {
 	vec3 Norm = normalize(fragNorm);
 	vec3 EyeDir = normalize(ubo.eyePos - fragPos);
@@ -76,11 +85,13 @@ void main() {
 	if (lightDir1.y > 0) {
 		SpotLight = spot_light_color(fragPos) * DiffColor;
 	}
+
+	vec3 Center = center_light(fragPos) * vec3(255, 255, 255);
 	
 	if(fragMaterial.x == 1.0f) {
-		outColor = vec4(Diffuse + Specular + Ambient, Texture.a);
+		outColor = vec4(Diffuse + Specular + Ambient + Center, Texture.a);
 	} else {
-		outColor = vec4(Diffuse + Specular + Ambient + SpotLight, 1.0f);
+		outColor = vec4(Diffuse + Specular + Ambient + SpotLight + Center, 1.0f);
 	}
 
 	if(ubo.ambient.y == 1.0) outColor *= vec4(vec3(86, 124, 251) / 255, 1);
