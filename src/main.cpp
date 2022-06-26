@@ -201,16 +201,6 @@ private:
 
 
     std::unordered_map<glm::ivec3, Chunk*> chunkMap;
-    std::mutex mapM;
-
-    std::mutex inM, outM;
-    std::queue<glm::ivec3> inQ;
-    std::queue<glm::ivec3> outQ;
-    std::condition_variable inC;
-    std::atomic_bool isThreadStopped = false;
-    std::atomic_bool threadProcessing = false;
-
-    std::thread chunkThread;
 
     Camera camera{};
     Player player{std::ref(camera) , std::ref(chunkMap)};
@@ -273,28 +263,12 @@ private:
 
         sunDir = glm::vec3(0, 1, 0);
 
-        chunkThread = std::thread(
-            chunkGeneratorFunction,
-            std::ref(chunkMap),
-            std::ref(mapM),
-            std::ref(inQ),
-            std::ref(inM),
-            std::ref(inC),
-            std::ref(outQ),
-            std::ref(outM),
-            std::ref(isThreadStopped),
-            std::ref(threadProcessing));
-
         toggleCursor();
 
         while (!glfwWindowShouldClose(window)) {
             glfwPollEvents();
             drawFrame();
         }
-
-        isThreadStopped = true;
-        inC.notify_one();
-        chunkThread.join();
 
         vkDeviceWaitIdle(device);
     }
@@ -335,26 +309,8 @@ private:
             waterIndices.clear();
             waterVertices.resize(1);
             waterIndices.resize(3);
-            isThreadStopped = true;
-            inC.notify_one();
-            chunkThread.join();
-            for (auto& chunk : chunkMap) {
-                delete chunk.second;
-            }
             chunkMap.clear();
             Chunk::setSeed(rand());
-            isThreadStopped = false;
-            chunkThread = std::thread(
-                chunkGeneratorFunction,
-                std::ref(chunkMap),
-                std::ref(mapM),
-                std::ref(inQ),
-                std::ref(inM),
-                std::ref(inC),
-                std::ref(outQ),
-                std::ref(outM),
-                std::ref(isThreadStopped),
-                std::ref(threadProcessing));
         }
 
         if (glfwGetKey(window, GLFW_KEY_O)) {
@@ -446,19 +402,19 @@ private:
                             checkWaterSpread = false;
                         }
                     }
-                    {
-                        std::unique_lock l(mapM);
-                        chunk->build();
-                        for (auto& index : neighbors) {
-                            auto iter = chunkMap.find(index);
-                            if (iter != chunkMap.end()) iter->second->build();
-                        }
+                    chunk->build();
+                    for (auto& index : neighbors) {
+                        auto iter = chunkMap.find(index);
+                        if (iter != chunkMap.end()) iter->second->build();
                     }
                 }
             }
         }
 
         if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE) leftPressed = false;
+
+        static std::queue<glm::ivec3> toCreate;
+        static std::unordered_set<Chunk*> toBuild;
 
 
         glm::ivec3 baseChunkIndex = Chunk::findChunkIndex(player.getCamera().getPosition());
@@ -469,10 +425,12 @@ private:
                 if (chunkMap.find(curChunkIndex) == chunkMap.end()) {
                     if (chunkIndexesToAdd.find(curChunkIndex) == chunkIndexesToAdd.end()) {
                         chunkIndexesToAdd.insert(curChunkIndex);
-                        {
-                            std::unique_lock l(inM);
-                            inQ.push(curChunkIndex);
-                            inC.notify_one();
+                        Chunk* newChunk = new Chunk(curChunkIndex, chunkMap);
+                        chunkMap.insert({ curChunkIndex, newChunk });
+                        toBuild.insert(newChunk);
+                        std::vector<std::pair<glm::ivec3, Chunk*>> neighbors = newChunk->getNeighbors();
+                        for (auto& c : neighbors) {
+                            toBuild.insert(c.second);
                         }
                     }
                 }
@@ -484,24 +442,18 @@ private:
             shouldRedraw = true;
         }
 
-        if (!threadProcessing) {
-            if (chunkIndexesToAdd.size()) {
-                std::vector<glm::ivec3> newChunks;
-                {
-                    std::unique_lock l(outM);
-                    while (!outQ.empty()) {
-                        newChunks.push_back(outQ.front());
-                        outQ.pop();
-                    }
-                }
-                if (!newChunks.empty()) shouldRedraw = true;
-                for (auto& iter : newChunks) {
-                    auto toErase = chunkIndexesToAdd.find(iter);
-                    if (toErase != chunkIndexesToAdd.end()) chunkIndexesToAdd.erase(toErase);
-                }
-            }
+        bool hasBuilt = false;
+
+
+        if (toBuild.size()) {
+            auto curChunkIter = toBuild.begin();
+            toBuild.erase(curChunkIter);
+            Chunk* curChunk = *curChunkIter;
+            curChunk->build();
+            hasBuilt = true;
+            shouldRedraw = true;
         }
-        if (shouldRedraw) {
+        if (shouldRedraw && !hasBuilt) {
             drawVisibleChunks();
             if (vertices.size()) {
                 curBuffer = (curBuffer + 1) % MAX_FRAMES_IN_FLIGHT;
@@ -590,21 +542,18 @@ private:
         waterIndices.resize(3);
         std::vector<Chunk*> visibleChunks;
         const int VIEW_RANGE = 2;
-        {
-            std::unique_lock l(mapM);
-            const glm::ivec3 baseChunkIndex = Chunk::findChunkIndex(player.getCamera().getPosition());
-            for (int i = -VIEW_RANGE; i <= VIEW_RANGE; ++i) {
-                for (int j = -VIEW_RANGE; j <= VIEW_RANGE; ++j) {
-                    glm::ivec3 curChunkIndex(baseChunkIndex.x + i * CHUNK_WIDTH, baseChunkIndex.y, baseChunkIndex.z + j * CHUNK_DEPTH);
-                    auto iter = chunkMap.find(curChunkIndex);
-                    if (iter != chunkMap.end()) {
-                        visibleChunks.push_back(iter->second);
-                    }
+        const glm::ivec3 baseChunkIndex = Chunk::findChunkIndex(player.getCamera().getPosition());
+        for (int i = -VIEW_RANGE; i <= VIEW_RANGE; ++i) {
+            for (int j = -VIEW_RANGE; j <= VIEW_RANGE; ++j) {
+                glm::ivec3 curChunkIndex(baseChunkIndex.x + i * CHUNK_WIDTH, baseChunkIndex.y, baseChunkIndex.z + j * CHUNK_DEPTH);
+                auto iter = chunkMap.find(curChunkIndex);
+                if (iter != chunkMap.end()) {
+                    visibleChunks.push_back(iter->second);
                 }
             }
-            for (auto& iter : visibleChunks) {
-                drawChunk(iter);
-            }
+        }
+        for (auto& iter : visibleChunks) {
+            drawChunk(iter);
         }
     }
 

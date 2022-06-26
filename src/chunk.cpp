@@ -339,64 +339,6 @@ void Chunk::setSeed(unsigned int seedIn) {
     Chunk::perlin = siv::PerlinNoise{ Chunk::seed };
 }
 
-
-void chunkGeneratorFunction(
-    std::unordered_map<glm::ivec3, Chunk*>& chunkMap,
-    std::mutex& mapM,
-    std::queue<glm::ivec3>& inQ,
-    std::mutex& inM,
-    std::condition_variable& inC,
-    std::queue<glm::ivec3>& outQ,
-    std::mutex& outM,
-    std::atomic_bool& isThreadStopped,
-    std::atomic_bool& threadProcessing) {
-
-    while (!isThreadStopped) {
-        std::vector<glm::ivec3> toBuild;
-        {
-            std::unique_lock l(inM);
-            while (inQ.empty()) {
-                threadProcessing = false;
-                inC.wait(l);
-                if (isThreadStopped) return;
-            }
-            while (!inQ.empty()) {
-                toBuild.push_back(inQ.front());
-                inQ.pop();
-            }
-        }
-        std::unordered_set<Chunk*> chunksToBuild;
-        for (auto& curPos : toBuild) {
-            auto iter = chunkMap.find(curPos);
-            Chunk* newChunk;
-            threadProcessing = true;
-            if (iter == chunkMap.end()) { // build new chunk
-                newChunk = new Chunk(curPos, chunkMap);
-                std::unique_lock l(mapM);
-                chunkMap.insert(std::pair(curPos, newChunk));
-            }
-            else { // rebuild chunk
-                newChunk = iter->second;
-            }
-            chunksToBuild.insert(newChunk);
-            std::vector<std::pair<glm::ivec3, Chunk*>> neighbors = newChunk->getNeighbors();
-            for (auto& c : neighbors) {
-                chunksToBuild.insert(c.second);
-            }
-
-        }
-
-        for (auto& c : chunksToBuild) {
-            c->build();
-        }
-
-        for (auto& curPos : toBuild) {
-            std::unique_lock l(outM);
-            outQ.push(curPos);
-        }
-    }
-}
-
 std::vector<glm::ivec3> Chunk::getBlockPositions(){
     std::vector<glm::ivec3> positions;
 
