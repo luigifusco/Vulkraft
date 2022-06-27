@@ -22,8 +22,8 @@ class Player {
         bool collision =  true;
         bool gravity = true;
         bool canJump = false;
-        const float gravityFactor = 0.8f;
-        const float jumpFactor = 0.19f;
+        const float gravityFactor = 50.f;
+        const float jumpFactor = 11.f;
         glm::vec3 gravityVector{0};
         std::unordered_set<glm::vec3> movements;
 

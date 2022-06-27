@@ -28,10 +28,11 @@ void Player::update(float deltaT){
     if(movements.empty() && !gravity) return;
 
     if(gravity && (!swimming)){
-        gravityVector += glm::vec3(0,-1,0) * gravityFactor * deltaT;
+        glm::vec3 acc = glm::vec3(0, -1, 0) * gravityFactor;
+        glm::vec3 dY = gravityVector * deltaT + (0.5f * acc * deltaT * deltaT);
         if(swimming) gravityVector *= 0.8f;
 
-        auto collisionResponse = Movement::resolveCollision(currentPosition, gravityVector, chunkMap);
+        auto collisionResponse = Movement::resolveCollision(currentPosition, dY, chunkMap);
 
         if(collisionResponse.collided){
             gravityVector = glm::vec3(0);
@@ -39,6 +40,8 @@ void Player::update(float deltaT){
                 canJump = true;
         }
         currentPosition = collisionResponse.position;
+        gravityVector += acc * deltaT;
+
     }
 
     for(const auto & mov : movements){
@@ -102,6 +105,9 @@ void Player::keyEventListener(GLFWwindow* window , float deltaT){
         if(canJump && gravity && !swimming){
             gravityVector = MovementDirection::Up * jumpFactor;
             canJump = false;
+        }
+        if (!gravity || swimming) {
+            movements.insert(MovementDirection::Up);
         }
     }
     
