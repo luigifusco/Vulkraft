@@ -445,10 +445,10 @@ private:
         bool hasBuilt = false;
 
 
-        if (toBuild.size()) {
+        if (!toBuild.empty()) {
             auto curChunkIter = toBuild.begin();
-            toBuild.erase(curChunkIter);
             Chunk* curChunk = *curChunkIter;
+            toBuild.erase(curChunkIter);
             curChunk->build();
             hasBuilt = true;
             shouldRedraw = true;

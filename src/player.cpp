@@ -27,7 +27,7 @@ void Player::update(float deltaT){
     
     if(movements.empty() && !gravity) return;
 
-    if(gravity && (!swimming || movements.find(MovementDirection::Up) == movements.end())){
+    if(gravity && (!swimming)){
         gravityVector += glm::vec3(0,-1,0) * gravityFactor * deltaT;
         if(swimming) gravityVector *= 0.8f;
 
@@ -100,10 +100,8 @@ void Player::keyEventListener(GLFWwindow* window , float deltaT){
     }
     if(glfwGetKey(window, GLFW_KEY_SPACE)) {
         if(canJump && gravity && !swimming){
-            gravityVector = MovementDirection::Up * jumpFactor * gravityFactor/4.5f;
+            gravityVector = MovementDirection::Up * jumpFactor;
             canJump = false;
-        } else {
-            movements.insert(MovementDirection::Up);
         }
     }
     
