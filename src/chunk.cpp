@@ -359,7 +359,7 @@ std::vector<glm::ivec3> Chunk::getBlockPositions(){
 bool Chunk::isBlockSolidLocal(glm::ivec3 position){
     if(position.y >= CHUNK_HEIGHT) return false;
 
-    return blocks[position.x][position.y][position.z].type->isSolid;
+    return blocks[position.x][position.y][position.z].type->isBreakable;
 }
 
 bool Chunk::isBlockSolidGlobal(glm::ivec3 position){
@@ -377,8 +377,11 @@ glm::ivec3 Chunk::findBlockIndex(glm::vec3 position) {
 
 bool Chunk::destroyLocal(glm::ivec3 position) {
     Block* block = &blocks[position.x][position.y][position.z];
-    if(!block->type->isSolid || block->type == BEDROCK) return false;
+    if(!block->type->isBreakable) return false;
     block->type = (BlockType*) AIR;
+    if (blocks[position.x][position.y + 1][position.z].type == BUSH) {
+        blocks[position.x][position.y + 1][position.z].type = (BlockType*)AIR;
+    }
     return true;
 }
 

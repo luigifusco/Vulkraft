@@ -9,8 +9,9 @@ class BlockType {
         static constexpr float textureSize = 1.0 / 16.0;
         const bool isSolid;
         const bool isOpaque;
+        const bool isBreakable;
 
-        BlockType(bool _isSolid, bool _isOpaque) : isSolid(_isSolid), isOpaque(_isOpaque) {}
+        BlockType(bool _isSolid, bool _isBreakable, bool _isOpaque) : isSolid(_isSolid), isBreakable(_isBreakable), isOpaque(_isOpaque) {}
 
         virtual bool isDiagonal() {
             return false;
@@ -41,7 +42,7 @@ class BlockType {
 
 class Air : public BlockType {
     public:
-        Air() : BlockType(false, false) {};
+        Air() : BlockType(false, false, false) {};
 
         glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
 
@@ -56,7 +57,7 @@ class Air : public BlockType {
 
 class Dirt : public BlockType {
     public:
-        Dirt() : BlockType(true, true) {};
+        Dirt() : BlockType(true, true, true) {};
 
         glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
 
@@ -67,7 +68,7 @@ class Dirt : public BlockType {
 
 class Grass : public BlockType {
     public:
-        Grass() : BlockType(true, true) {};
+        Grass() : BlockType(true, true, true) {};
 
         glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
 
@@ -78,7 +79,7 @@ class Grass : public BlockType {
 
 class WoodLog : public BlockType {
     public:
-        WoodLog() : BlockType(true, true) {};
+        WoodLog() : BlockType(true, true, true) {};
 
         glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
 
@@ -89,7 +90,7 @@ class WoodLog : public BlockType {
 
 class WoodPlank : public BlockType {
     public:
-        WoodPlank() : BlockType(true, true) {};
+        WoodPlank() : BlockType(true, true, true) {};
 
         glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
 
@@ -100,7 +101,7 @@ class WoodPlank : public BlockType {
 
 class Stone : public BlockType {
     public:
-        Stone() : BlockType(true, true) {};
+        Stone() : BlockType(true, true, true) {};
 
         glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
 
@@ -111,7 +112,7 @@ class Stone : public BlockType {
 
 class Cobblestone : public BlockType {
     public:
-        Cobblestone() : BlockType(true, true) {};
+        Cobblestone() : BlockType(true, true, true) {};
 
         glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
 
@@ -122,7 +123,7 @@ class Cobblestone : public BlockType {
 
 class Sand : public BlockType {
     public:
-        Sand() : BlockType(true, true) {};
+        Sand() : BlockType(true, true, true) {};
 
         glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
 
@@ -133,7 +134,7 @@ class Sand : public BlockType {
 
 class Gravel : public BlockType {
     public:
-        Gravel() : BlockType(true, true) {};
+        Gravel() : BlockType(true, true, true) {};
 
         glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
 
@@ -144,7 +145,7 @@ class Gravel : public BlockType {
 
 class Bedrock : public BlockType {
     public:
-        Bedrock() : BlockType(true, true) {};
+        Bedrock() : BlockType(true, false, true) {};
 
         glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
 
@@ -155,7 +156,7 @@ class Bedrock : public BlockType {
 
 class Leaves : public BlockType {
     public:
-        Leaves() : BlockType(true, false) {};
+        Leaves() : BlockType(true, true, false) {};
 
         glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
 
@@ -166,7 +167,7 @@ class Leaves : public BlockType {
 
 class Water : public BlockType {
     public:
-        Water() : BlockType(false, false) {};
+        Water() : BlockType(false, false, false) {};
 
         bool shouldBlend() override {
             return true;
@@ -189,7 +190,7 @@ class Water : public BlockType {
 
 class Bush : public BlockType {
     public:
-        Bush() : BlockType(true, false) {};
+        Bush() : BlockType(false, true, false) {};
 
         bool isDiagonal() override {
             return true;

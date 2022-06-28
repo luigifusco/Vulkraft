@@ -93,7 +93,7 @@ void Player::keyEventListener(GLFWwindow* window , float deltaT){
         movements.insert(MovementDirection::Right);
     }        
     if(glfwGetKey(window, GLFW_KEY_S)) {
-        movements.insert(MovementDirection::Backward);
+        movements.insert(MovementDirection::Backward); 
     }
     if(glfwGetKey(window, GLFW_KEY_W)) {
         movements.insert(MovementDirection::Forward);
