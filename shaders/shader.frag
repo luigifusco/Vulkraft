@@ -83,7 +83,8 @@ void main() {
 
 	vec3 SpotLight = vec3(0);
 	if (lightDir1.y > 0) {
-		SpotLight = spot_light_color(fragPos) * DiffColor;
+		SpotLight += Oren_Nayar_Diffuse_BRDF(EyeDir, Norm, EyeDir, DiffColor, fragMaterial.y) * spot_light_color(fragPos);
+		SpotLight += Phong_Specular_BRDF(EyeDir, Norm, EyeDir, vec3(0.05), fragMaterial.z) * spot_light_color(fragPos);
 	}
 
 	vec3 Center = center_light(fragPos) * vec3(255, 255, 255);

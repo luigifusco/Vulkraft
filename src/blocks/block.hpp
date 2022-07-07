@@ -29,7 +29,7 @@ class BlockType {
             return glm::vec3(
                 0.0f,       // Blend (boolean)
                 2.0f,       // Roughness
-                200.0f      // Specularity
+                20.0f      // Specularity
             );
         }
 
