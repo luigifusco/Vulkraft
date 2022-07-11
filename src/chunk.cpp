@@ -4,6 +4,7 @@
 #include <unordered_map>
 
 #include <vulkan/vulkan.h>
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
 
 #include <iostream>

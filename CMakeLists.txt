@@ -12,7 +12,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY  ${CMAKE_CURRENT_BINARY_DIR}/bin)
 
 file(GLOB_RECURSE sources src/*.cpp src/*.hpp)
 
-
+add_compile_options(-O2)
 
 add_executable(main ${sources})
 

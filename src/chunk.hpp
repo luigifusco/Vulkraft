@@ -125,14 +125,3 @@ class Chunk {
 
 		void spreadWater(glm::ivec3 position);
 };
-
-void chunkGeneratorFunction(
-	std::unordered_map<glm::ivec3, Chunk*>& chunkMap,
-	std::mutex& mapM,
-	std::queue<glm::ivec3>& inQ,
-	std::mutex& inM,
-	std::condition_variable& inC,
-	std::queue<glm::ivec3>& outQ,
-	std::mutex& outM,
-	std::atomic_bool& isThreadStopped,
-	std::atomic_bool& threadProcessing);

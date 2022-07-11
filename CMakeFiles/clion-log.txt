@@ -1,0 +1,5 @@
+/snap/clion/198/bin/cmake/linux/bin/cmake -DCMAKE_MAKE_PROGRAM=/snap/clion/198/bin/ninja/linux/ninja -G Ninja -S /home/luigi/Projects/graphics-ferrazzo-fratus-fusco -B /home/luigi/Projects/graphics-ferrazzo-fratus-fusco
+-- Including X11 support
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/luigi/Projects/graphics-ferrazzo-fratus-fusco

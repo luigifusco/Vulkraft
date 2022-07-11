@@ -36,7 +36,7 @@ void Player::update(float deltaT){
 
         if(collisionResponse.collided){
             gravityVector = glm::vec3(0);
-            if (currentPosition.y + gravityVector.y - collisionResponse.position.y > 0)
+            if (currentPosition.y + dY.y - collisionResponse.position.y > 0)
                 canJump = true;
         }
         currentPosition = collisionResponse.position;
