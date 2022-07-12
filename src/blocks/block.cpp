@@ -47,7 +47,7 @@ glm::vec2 Grass::getTextureOffset(Direction dir, glm::ivec3 corner) {
 	glm::vec2 blockOffset = BlockType::purge(dir, corner);
     switch(dir) {
         case Direction::Up:
-            fileOffset = glm::vec2(0, 0);	// TODO: wtf
+            fileOffset = glm::vec2(0, 0);
             break;
         case Direction::Down:
             fileOffset = glm::vec2(2, 0);
@@ -75,7 +75,7 @@ glm::vec2 WoodLog::getTextureOffset(Direction dir, glm::ivec3 corner) {
 }
 
 glm::vec2 WoodPlank::getTextureOffset(Direction dir, glm::ivec3 corner) {
-	glm::vec2 fileOffset(5, 0);
+	glm::vec2 fileOffset(4, 0);
 	glm::vec2 blockOffset = BlockType::purge(dir, corner);
     return (fileOffset + blockOffset) * BlockType::textureSize;
 }

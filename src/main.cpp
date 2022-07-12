@@ -326,10 +326,17 @@ private:
         static std::unordered_set<glm::ivec3> chunkIndexesToAdd;
 
         static bool leftPressed = false;
+        static bool rightPressed = false;
         static bool shouldRedraw = false;
 
-        if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && !leftPressed) {
-            leftPressed = true;
+        bool leftDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
+        bool leftUp = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE;
+        bool rightDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
+        bool rightUp = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_RELEASE;
+
+        if ((leftDown || rightDown) && !leftPressed && !rightPressed) {
+            leftPressed = leftDown;
+            rightPressed = rightDown;
             shouldRedraw = true;
 
             Camera camera = player.getCamera();
@@ -347,13 +354,14 @@ private:
             );
 
             if(hit) {
+                if(rightDown) target += norm;   // Target becomes the adjacent block on right click
                 glm::ivec3 baseChunkIndex = Chunk::findChunkIndex(target);
                 Chunk* chunk = chunkMap.find(baseChunkIndex)->second;
                 glm::ivec3 blockIndex = Chunk::findBlockIndex(target);
-                if(chunk->destroyLocal(blockIndex)) {   
+                if((leftDown && chunk->destroyLocal(blockIndex)) || (rightDown && chunk->placeLocal(blockIndex))) { 
                     chunkIndexesToAdd.insert(baseChunkIndex);
                     std::vector<glm::ivec3> neighbors;
-                    bool checkWaterSpread = true;
+                    bool checkWaterSpread = leftDown;   // Check water spread only when destroying
                     if (chunk->isBlockWaterLocal(target + glm::ivec3(0, 1, 0))) {
                         chunk->spreadWater(target);
                         checkWaterSpread = false;
@@ -411,7 +419,10 @@ private:
             }
         }
 
-        if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE) leftPressed = false;
+        if (leftUp || rightUp) {
+            leftPressed = leftDown;
+            rightPressed = rightDown;
+        }
 
         static std::queue<glm::ivec3> toCreate;
         static std::unordered_set<Chunk*> toBuild;

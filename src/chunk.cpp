@@ -390,6 +390,17 @@ bool Chunk::destroyGlobal(glm::ivec3 position) {
     return destroyLocal(position - coordinates);
 }
 
+bool Chunk::placeLocal(glm::ivec3 position) {
+    Block* block = &blocks[position.x][position.y][position.z];
+    if(block->type->isSolid) return false;
+    block->type = (BlockType*) WOOD_PLANK;
+    return true;
+}
+
+bool Chunk::placeGlobal(glm::ivec3 position) {
+    return placeLocal(position - coordinates);
+}
+
 bool Chunk::isBlockWaterLocal(glm::ivec3 position) {
     if(position.y >= CHUNK_HEIGHT) return false;
 
