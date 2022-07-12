@@ -5,3 +5,9 @@ build/
 CMakeFiles/
 .idea/
 .cmake/
+*.ninja
+*.ninja_log
+*.ninja_deps
+*.cmake
+bin/
+Testing/
