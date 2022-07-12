@@ -6,7 +6,7 @@
 Name and Surname | Personal Code |            Email            | Github Username
 :---: |:-------------:|:---------------------------:| :---:
 Daniele Ferrazzo |       x       |              x              | x
-Lorenzo Fratus |       x       |              x              |        x
+Lorenzo Fratus |   10619073    | lorenzo1.fratus@mail.polimi.it | @lorenzofratus
 Luigi Fusco |   10601210    | luigi1.fusco@mail.polimi.it |        @luigifusco  
 
 ### Description
