@@ -87,7 +87,7 @@ void main() {
 		SpotLight += Phong_Specular_BRDF(EyeDir, Norm, EyeDir, vec3(0.05), fragMaterial.z) * spot_light_color(fragPos);
 	}
 
-	vec3 Center = center_light(fragPos) * vec3(255, 255, 255);
+	vec3 Center = center_light(fragPos) * vec3(255, 255, 255) * 1000;
 	
 	if(fragMaterial.x == 1.0f) {
 		outColor = vec4(Diffuse + Specular + Ambient + Center, Texture.a);
