@@ -348,7 +348,7 @@ private:
                 [&](glm::ivec3 position) -> bool {
                     glm::ivec3 baseChunkIndex = Chunk::findChunkIndex(position);
                     Chunk* chunk = chunkMap.find(baseChunkIndex)->second;
-                    return chunk->isBlockSolidGlobal(position);
+                    return chunk->isBlockBreakableGlobal(position);
                 },
                 position, direction, 5, target, norm
             );

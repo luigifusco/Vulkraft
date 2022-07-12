@@ -123,6 +123,9 @@ class Chunk {
 		bool isBlockSolidLocal(glm::ivec3 position);
 		bool isBlockSolidGlobal(glm::ivec3 position);
 
+		bool isBlockBreakableLocal(glm::ivec3 position);
+		bool isBlockBreakableGlobal(glm::ivec3 position);
+
 		bool isBlockWaterLocal(glm::ivec3 position);
 		bool isBlockWaterGlobal(glm::ivec3 position);
 

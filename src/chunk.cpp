@@ -360,11 +360,21 @@ std::vector<glm::ivec3> Chunk::getBlockPositions(){
 bool Chunk::isBlockSolidLocal(glm::ivec3 position){
     if(position.y >= CHUNK_HEIGHT) return false;
 
-    return blocks[position.x][position.y][position.z].type->isBreakable;
+    return blocks[position.x][position.y][position.z].type->isSolid;
 }
 
 bool Chunk::isBlockSolidGlobal(glm::ivec3 position){
     return isBlockSolidLocal(position - coordinates);
+}
+
+bool Chunk::isBlockBreakableLocal(glm::ivec3 position){
+    if(position.y >= CHUNK_HEIGHT) return false;
+
+    return blocks[position.x][position.y][position.z].type->isBreakable;
+}
+
+bool Chunk::isBlockBreakableGlobal(glm::ivec3 position){
+    return isBlockBreakableLocal(position - coordinates);
 }
 
 glm::ivec3 Chunk::findChunkIndex(glm::vec3 position) {
