@@ -5,7 +5,7 @@
 #include <unordered_map>
 #include <cmath>
 
-#include "AABB.hpp"
+#include "movement/AABB.hpp"
 
 std::vector<glm::ivec3> Movement::getPositionsToCheck(glm::vec3 position){
     std::vector<glm::ivec3> positions;

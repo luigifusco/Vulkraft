@@ -1,6 +1,6 @@
 #include "player.hpp"
 
-#include "movement.hpp"
+#include "movement/movement.hpp"
 
 #include <iostream>
 

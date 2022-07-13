@@ -37,15 +37,14 @@
 #include <functional>
 #include <atomic>
 
-#include "chunk.hpp"
-#include "player.hpp"
-#include "camera.hpp"
+#include "chunk/chunk.hpp"
+#include "player/player.hpp"
+#include "camera/camera.hpp"
 #include "raycast/trace-ray.hpp"
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
 
-const std::string MODEL_PATH = "models/viking_room.obj";
 const std::string TEXTURE_PATH = "textures/blocks.png";
 
 const int MAX_FRAMES_IN_FLIGHT = 2;
@@ -111,7 +110,7 @@ struct FragmentUniformBufferObject {
     alignas(16) glm::vec3 eyeDir;
 };
 
-class HelloTriangleApplication {
+class VulkraftApplication {
 public:
     void run() {
         waterVertices.resize(1);
@@ -210,13 +209,13 @@ private:
 
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-        window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
+        window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkraft", nullptr, nullptr);
         glfwSetWindowUserPointer(window, this);
         glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
     }
 
     static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
-        auto app = reinterpret_cast<HelloTriangleApplication*>(glfwGetWindowUserPointer(window));
+        auto app = reinterpret_cast<VulkraftApplication*>(glfwGetWindowUserPointer(window));
         app->framebufferResized = true;
     }
 
@@ -2185,7 +2184,7 @@ private:
 int main() {
     srand(time(NULL));
 
-    HelloTriangleApplication app;
+    VulkraftApplication app;
 
     try {
         app.run();
