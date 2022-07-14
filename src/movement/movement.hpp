@@ -3,7 +3,7 @@
 #include <unordered_map>
 #include <glm/glm.hpp>
 
-#include "chunk/chunk.hpp"
+#include "../chunk/chunk.hpp"
 
 
 namespace MovementDirection {

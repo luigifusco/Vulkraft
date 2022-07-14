@@ -5,8 +5,8 @@
 
 #include <unordered_map>
 
-#include "camera/camera.hpp"
-#include "chunk/chunk.hpp"
+#include "../camera/camera.hpp"
+#include "../chunk/chunk.hpp"
 #include <unordered_set>
 
 class Player {

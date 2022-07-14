@@ -16,10 +16,10 @@
 
 #include <iostream>
 
-#include "blocks/block.hpp"
-#include "structures/structure.hpp"
-#include "utils/enums.hpp"
-#include "utils/perlin_noise.hpp"
+#include "../blocks/block.hpp"
+#include "../structures/structure.hpp"
+#include "../utils/enums.hpp"
+#include "../utils/perlin_noise.hpp"
 #include "chunk.hpp"
 
 siv::PerlinNoise::seed_type Chunk::seed = 0;
