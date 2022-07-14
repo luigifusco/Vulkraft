@@ -4,7 +4,7 @@
 Camera::Camera(){
     CamMat = getMatrix();
     CamDir = glm::mat3(1.0f);
-    CamPos = glm::vec3(16.0f , 50.0f , 16.0f);
+    CamPos = glm::vec3(16.0f , 300.0f , 16.0f);
     CamAng = glm::vec3(0.0f);
 }
 
