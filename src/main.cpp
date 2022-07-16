@@ -95,19 +95,19 @@ struct SwapChainSupportDetails {
 };
 
 struct VertexUniformBufferObject {
-    alignas(16) glm::mat4 model;
-    alignas(16) glm::mat4 view;
-    alignas(16) glm::mat4 proj;
+    alignas(16) glm::mat4 mvpMat;
+    alignas(16) glm::mat4 mMat;
+    alignas(16) glm::mat4 nMat;
 };
 
 struct FragmentUniformBufferObject {
-    alignas(16) glm::vec3 lightDir0;
-    alignas(16) glm::vec3 lightCol0;
-    alignas(16) glm::vec3 lightDir1;
-    alignas(16) glm::vec3 lightCol1;
+    alignas(16) glm::vec3 sunLightDir;
+    alignas(16) glm::vec3 sunLightCol;
+    alignas(16) glm::vec3 moonLightDir;
+    alignas(16) glm::vec3 moonLightCol;
     alignas(16) glm::vec3 eyePos;
-    alignas(16) glm::vec2 ambient;
     alignas(16) glm::vec3 eyeDir;
+    alignas(16) glm::vec2 ambientParams;
 };
 
 class VulkraftApplication {
@@ -486,6 +486,8 @@ private:
 
 
 
+        //// Set uniform buffers fields
+
         // Projection (perspective) matrix
 		glm::mat4 Prj = glm::perspective(
             glm::radians(80.0f),                                        // Field of view
@@ -493,24 +495,27 @@ private:
 			0.1f, 200.0f                                                // Near and far planes
         );
 		Prj[1][1] *= -1;    // Flip Y-axis to adapt to Vulkan convention
-	
+    
+        // View matrix
+        glm::mat4 View = player.getCamera().getMatrix();
 
+        // World matrix (unused)
+        glm::mat4 World = glm::mat4(1.0f); 
 
-		// Update global uniforms
 		VertexUniformBufferObject vubo{};
-        vubo.model = glm::mat4(1.0f);
-        vubo.view = player.getCamera().getMatrix();
-        vubo.proj = Prj;
+        vubo.mvpMat = Prj * View * World;
+        vubo.mMat = World;
+        vubo.nMat = glm::inverse(glm::transpose(vubo.mMat));
 
         FragmentUniformBufferObject fubo{};        
-        fubo.lightDir0 = sunDir;
-        fubo.lightCol0 = glm::vec3(0.8f) * visibility;
-        fubo.lightDir1 = sunDir * -1.0f;
-        fubo.lightCol1 = glm::vec3(0.1f) * (1 - visibility);
+        fubo.sunLightDir = glm::normalize(sunDir);
+        fubo.sunLightCol = glm::vec3(0.8f) * visibility;
+        fubo.moonLightDir = glm::normalize(sunDir * -1.0f);
+        fubo.moonLightCol = glm::vec3(0.1f) * (1 - visibility);
         fubo.eyePos = player.getCamera().getPosition();
-        fubo.ambient.x = visibility * 0.175 + (1 - visibility) * 0.025;
-        fubo.ambient.y = player.isSwimming();
         fubo.eyeDir = player.getCamera().getDirection();
+        fubo.ambientParams.x = visibility * 0.175 + (1 - visibility) * 0.025;
+        fubo.ambientParams.y = player.isSwimming();
 
 		void* data;
 		vkMapMemory(device, vertexUniformBuffersMemory[currentImage], 0, sizeof(vubo), 0, &data);

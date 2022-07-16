@@ -27,9 +27,9 @@ class BlockType {
 
         virtual glm::vec3 getMaterialSettings() {
             return glm::vec3(
-                0.0f,       // Blend (boolean)
+                1.0f,       // Minimum opacity (boolean)
                 2.0f,       // Roughness
-                20.0f       // Specularity
+                -1.0f       // Specularity
             );
         }
 
@@ -175,9 +175,9 @@ class Water : public BlockType {
 
         glm::vec3 getMaterialSettings() override {
             return glm::vec3(
-                1.0f,       // Blend (boolean)
+                0.0f,       // Minimum opacity (boolean)
                 0.3f,       // Roughness
-                20.0f       // Specularity
+                200.0f      // Specularity
             );
         }
 

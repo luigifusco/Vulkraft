@@ -1,24 +1,25 @@
 #version 450
 
-layout(binding = 1) uniform FragmentUniformBufferObject {
-    vec3 lightDir0;
-	vec3 lightCol0;
-	vec3 lightDir1;
-	vec3 lightCol1;
+layout(binding = 1) uniform GlobalUniformBufferObject {
+    vec3 sunLightDir;
+	vec3 sunLightCol;
+	vec3 moonLightDir;
+	vec3 moonLightCol;
 	vec3 eyePos;
-	vec2 ambient;	// x: ambient light factor, y: whether in water or not
-	vec3 eyeDir;
-} ubo;
+	vec3 eyeDir;		// Used to render the torch and the pointer
+	vec2 ambientParams;	// x: ambient light factor, y: whether the player is in water or not
+} gubo;
+
 layout(binding = 2) uniform sampler2D texSampler;
 
-layout(location = 0) in vec3 fragNorm;
-layout(location = 1) in vec2 fragTexCoord;
-layout(location = 2) in vec3 fragPos;
-layout(location = 3) in vec3 fragMaterial;
+layout(location = 0) in vec3 fragPos;
+layout(location = 1) in vec3 fragNorm;
+layout(location = 2) in vec2 fragTexCoord;
+layout(location = 3) in vec3 fragMaterial;	// x: minimum opacity, y: roughness, z: specularity
 
 layout(location = 0) out vec4 outColor;
 
-vec3 Oren_Nayar_Diffuse_BRDF(vec3 lightDir, vec3 normVect, vec3 viewDir, vec3 mainColor, float sigma) {	
+vec3 oren_nayar_diffuse(vec3 lightDir, vec3 normVect, vec3 viewDir, vec3 mainColor, float sigma) {	
 	float theta_i = acos(dot(lightDir, normVect));
 	float theta_r = acos(dot(viewDir, normVect));
 	float alpha = max(theta_i, theta_r);
@@ -36,64 +37,57 @@ vec3 Oren_Nayar_Diffuse_BRDF(vec3 lightDir, vec3 normVect, vec3 viewDir, vec3 ma
 	return L * (A + B * G * sin(alpha) * tan(beta));
 }
 
-vec3 Phong_Specular_BRDF(vec3 lightDir, vec3 normVect, vec3 viewDir, vec3 mainColor, float gamma)  {
-	vec3 R = 2 * normVect * dot(lightDir, normVect) - lightDir;
-	return mainColor * pow(clamp(dot(viewDir, R), 0, 1), gamma);
+vec3 phong_specular(vec3 lightDir, vec3 normVect, vec3 viewDir, vec3 mainColor, float gamma)  {
+	vec3 reflectDir = -reflect(lightDir, normVect);
+	return mainColor * pow(clamp(dot(viewDir, reflectDir), 0, 1), gamma);
 }
 
-vec3 spot_light_color(vec3 pos) {
-	// Spot light color
-	float cos_alpha = dot(normalize(ubo.eyePos - pos), ubo.eyeDir);
-	float c_in = cos(0.261799f);
-	float c_out = cos(0.523599f);
-	float dimming = clamp((cos_alpha - c_out) / (c_in - c_out), 0, 1);
-	return vec3(.3 * (244./255.),.3 * (252./255.),.3 * (3./255.)) * dimming * pow((1 / length(ubo.eyePos - pos)),1.f);
-}
-
-vec3 center_light(vec3 pos) {
-	// Spot light color
-	float cos_alpha = dot(normalize(ubo.eyePos - pos), ubo.eyeDir);
-	float c_in = cos(0.005f);
-	float c_out = cos(0.01f);
-	float dimming = clamp((cos_alpha - c_out) / (c_in - c_out), 0, 1);
-	return vec3(.3 * (244./255.),.3 * (252./255.),.3 * (3./255.)) * dimming * pow((1 / length(ubo.eyePos - pos)),1.f);
+vec3 spot_light_color(vec3 pos, vec3 lightDir, vec3 lightPos, vec3 lightCol, vec4 lightParams) {
+	float cos_alpha = dot(normalize(lightPos - pos), lightDir);
+	float cone = clamp((cos_alpha - lightParams.y) / (lightParams.x - lightParams.y), 0, 1);
+	return pow(lightParams.w / length(lightPos - pos), lightParams.z) * lightCol * cone;
 }
 
 void main() {
-	vec3 Norm = normalize(fragNorm);
-	vec3 EyeDir = normalize(ubo.eyePos - fragPos);
-
-	vec3 lightDir0 = normalize(ubo.lightDir0);
-	vec3 lightDir1 = normalize(ubo.lightDir1);
+	vec3 norm = normalize(fragNorm);
+	vec3 eyeDir = normalize(gubo.eyePos - fragPos);	
 	
-	vec4 Texture = texture(texSampler, fragTexCoord);
-	if(Texture.a == 0) discard;
-
-	vec3 DiffColor = Texture.rgb;
+	vec4 texel = texture(texSampler, fragTexCoord);
+	if(texel.a == 0) discard;
 	
-	vec3 Diffuse = vec3(0);
-	Diffuse += Oren_Nayar_Diffuse_BRDF(lightDir0, Norm, EyeDir, DiffColor, fragMaterial.y) * ubo.lightCol0;
-	Diffuse += Oren_Nayar_Diffuse_BRDF(lightDir1, Norm, EyeDir, DiffColor, fragMaterial.y) * ubo.lightCol1;
+	// Parameters
+	vec3 waterColor = vec3(65, 105, 225) / 255;
+	vec3 diffuseColor = texel.rgb * (1 - gubo.ambientParams.y) + 			// Normal color
+						texel.rgb * waterColor * gubo.ambientParams.y;		// Underwater color
+
+	vec3 specularColor = vec3(clamp(sign(fragMaterial.z), 0, 0.5));
+
+	vec4 torchParams = vec4(cos(radians(15)), cos(radians(30)), 2.0, 1.4);
+	vec3 torchColor = spot_light_color(fragPos, gubo.eyeDir, gubo.eyePos, vec3(255, 215, 0) / 255, torchParams);
+	float torchOn = max(0, sign(gubo.moonLightDir.y));	// The torch is on only at night (when the moon is over the horizon)
+
+	vec4 pointerParams = vec4(cos(0.002f), cos(0.005f), 1, 1);
+	vec3 pointerColor = spot_light_color(fragPos, gubo.eyeDir, gubo.eyePos, vec3(1), pointerParams);
+
+	// Diffuse light component
+	vec3 diffuse = vec3(0);
+	diffuse += oren_nayar_diffuse( gubo.sunLightDir, norm, eyeDir, diffuseColor, fragMaterial.y) * gubo.sunLightCol;
+	diffuse += oren_nayar_diffuse(gubo.moonLightDir, norm, eyeDir, diffuseColor, fragMaterial.y) * gubo.moonLightCol;
+	diffuse += oren_nayar_diffuse(			 eyeDir, norm, eyeDir, diffuseColor, fragMaterial.y) * torchColor * torchOn;
 	
-	vec3 Specular = vec3(0);
-	Specular += Phong_Specular_BRDF(lightDir0, Norm, EyeDir, vec3(0.05), fragMaterial.z) * ubo.lightCol0;
-	Specular += Phong_Specular_BRDF(lightDir1, Norm, EyeDir, vec3(0.05), fragMaterial.z) * ubo.lightCol1;
+	// Specular light component
+	vec3 specular = vec3(0);
+	specular += phong_specular( gubo.sunLightDir, norm, eyeDir, specularColor, abs(fragMaterial.z)) * gubo.sunLightCol;
+	specular += phong_specular(gubo.moonLightDir, norm, eyeDir, specularColor, abs(fragMaterial.z)) * gubo.moonLightCol;
+	specular += phong_specular(			  eyeDir, norm, eyeDir, specularColor, abs(fragMaterial.z)) * torchColor * torchOn;
 
-	vec3 Ambient = ubo.ambient.x * DiffColor;
+	// Ambient light component
+	vec3 ambient = gubo.ambientParams.x * diffuseColor;	
 
-	vec3 SpotLight = vec3(0);
-	if (lightDir1.y > 0) {
-		SpotLight += Oren_Nayar_Diffuse_BRDF(EyeDir, Norm, EyeDir, DiffColor, fragMaterial.y) * spot_light_color(fragPos);
-		SpotLight += Phong_Specular_BRDF(EyeDir, Norm, EyeDir, vec3(0.05), fragMaterial.z) * spot_light_color(fragPos);
-	}
-
-	vec3 Center = center_light(fragPos) * vec3(255, 255, 255) * 1000;
+	// Pointer "light" component
+	vec3 pointer = 1000 * pointerColor;
 	
-	if(fragMaterial.x == 1.0f) {
-		outColor = vec4(Diffuse + Specular + Ambient + Center, Texture.a);
-	} else {
-		outColor = vec4(Diffuse + Specular + Ambient + SpotLight + Center, 1.0f);
-	}
-
-	if(ubo.ambient.y == 1.0) outColor *= vec4(vec3(86, 124, 251) / 255, 1);
+	// Assemble the final color
+	float alphaChannel = max(fragMaterial.x, texel.a);
+	outColor = vec4(diffuse + specular + ambient + pointer, alphaChannel);
 }
