@@ -259,7 +259,6 @@ private:
     }
 
     void mainLoop() {
-
         sunDir = glm::vec3(0, 1, 0);
 
         toggleCursor();
@@ -272,66 +271,16 @@ private:
         vkDeviceWaitIdle(device);
     }
 
-    void updateUniformBuffer(uint32_t currentImage) {
-		static auto startTime = std::chrono::high_resolution_clock::now();
-		static float lastTime = 0.0f;
-        static glm::ivec3 oldChunkIndex(0, 0, 0);
-		
-		auto currentTime = std::chrono::high_resolution_clock::now();
-		float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-		float deltaT = time - lastTime;
-		lastTime = time;
-					
-		static float debounce = time;
-        bool debounced = time - debounce > 0.33;
-
-        if(glfwGetKey(window, GLFW_KEY_ESCAPE) && debounced) {
-            toggleCursor();
-            debounce = time;
-            framebufferResized = true;
-        }
-
-        if(!cursorEnabled && debounced) {
-			player.cursorPositionEventListener(window);
-            player.keyEventListener(window , deltaT);
-        }
-
-        if(glfwGetKey(window, GLFW_KEY_P) && debounced) {
-            player.updatePhysics();
-            debounce = time;
-        }		
-
-        if (glfwGetKey(window, GLFW_KEY_R)) {
-            vertices.clear();
-            indices.clear();
-            waterVertices.clear();
-            waterIndices.clear();
-            waterVertices.resize(1);
-            waterIndices.resize(3);
-            chunkMap.clear();
-            Chunk::setSeed(rand());
-        }
-
-        if (glfwGetKey(window, GLFW_KEY_O)) {
-            sunDir = glm::vec3(0.f, 1.f, 0.f);
-        }
-
-        if (glfwGetKey(window, GLFW_KEY_I)) {
-            sunDir = glm::vec3(0.f, -1.f, 0.f);
-        }
-
-
-
-        static std::unordered_set<glm::ivec3> chunkIndexesToAdd;
-
+    bool handleMouseClick(std::unordered_set<glm::ivec3>* chunkIndexesToAdd) {
         static bool leftPressed = false;
         static bool rightPressed = false;
-        static bool shouldRedraw = false;
 
         bool leftDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
         bool leftUp = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE;
         bool rightDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
         bool rightUp = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_RELEASE;
+
+        bool shouldRedraw = false;
 
         if ((leftDown || rightDown) && !leftPressed && !rightPressed) {
             leftPressed = leftDown;
@@ -358,7 +307,7 @@ private:
                 Chunk* chunk = chunkMap.find(baseChunkIndex)->second;
                 glm::ivec3 blockIndex = Chunk::findBlockIndex(target);
                 if((leftDown && chunk->destroyLocal(blockIndex)) || (rightDown && chunk->placeLocal(blockIndex))) { 
-                    chunkIndexesToAdd.insert(baseChunkIndex);
+                    chunkIndexesToAdd->insert(baseChunkIndex);
                     std::vector<glm::ivec3> neighbors;
                     bool checkWaterSpread = leftDown;   // Check water spread only when destroying
                     if (chunk->isBlockWaterLocal(target + glm::ivec3(0, 1, 0))) {
@@ -423,6 +372,59 @@ private:
             rightPressed = rightDown;
         }
 
+        return shouldRedraw;
+    }
+
+    void updateUniformBuffer(uint32_t currentImage) {
+		static auto startTime = std::chrono::high_resolution_clock::now();
+		static float lastTime = 0.0f;
+        static glm::ivec3 oldChunkIndex(0, 0, 0);
+		
+		auto currentTime = std::chrono::high_resolution_clock::now();
+		float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+		float deltaT = time - lastTime;
+		lastTime = time;
+					
+		static float debounce = time;
+
+        if (glfwGetKey(window, GLFW_KEY_ESCAPE)) {
+            if(time - debounce > 0.33) {
+                toggleCursor();
+                debounce = time;
+                framebufferResized = true;
+            }
+        }
+        if (glfwGetKey(window, GLFW_KEY_P)) {
+            if(time - debounce > 0.33) {
+                player.updatePhysics();
+                debounce = time;
+            }
+        }
+        if (glfwGetKey(window, GLFW_KEY_O)) {
+            if(time - debounce > 0.33) {
+                sunDir = glm::vec3(0.f, 1.f, 0.f);
+                debounce = time;
+            }
+        }
+        if (glfwGetKey(window, GLFW_KEY_I)) {
+            if(time - debounce > 0.33) {
+                sunDir = glm::vec3(0.f, -1.f, 0.f);
+                debounce = time;
+            }
+        }
+
+        static bool shouldRedraw = false;
+        static std::unordered_set<glm::ivec3> chunkIndexesToAdd;
+        
+        if (!cursorEnabled) {
+            player.cursorPositionEventListener(window);
+            player.keyEventListener(window, deltaT);
+            shouldRedraw = handleMouseClick(&chunkIndexesToAdd);
+        }
+
+
+        
+
         static std::queue<glm::ivec3> toCreate;
         static std::unordered_set<Chunk*> toBuild;
 
@@ -473,23 +475,32 @@ private:
             shouldRedraw = false;
         }
 
-        const float SUN_SPEED = glm::radians(0.03f);
-        sunDir = (glm::rotate(glm::mat4(1.0f), SUN_SPEED, glm::vec3(1, 0, 0)) * glm::vec4(sunDir, 1.0f));
 
-					
-		glm::mat4 Prj = glm::perspective(glm::radians(80.0f),
-						swapChainExtent.width / (float) swapChainExtent.height,
-						0.1f, 200.0f);
-		Prj[1][1] *= -1;
+
+        // Update sun (and moon) position, visibility is a [0,1] value used to shut the sun
+        // off when its below the horizon (1 - visibility is the equivalent for the moon)
+        const float SUN_SPEED = glm::radians(0.03f);
+        const float threshold = 0.75f;
+        sunDir = (glm::rotate(glm::mat4(1.0f), SUN_SPEED, glm::vec3(1, 0, 0)) * glm::vec4(sunDir, 1.0f));
+        float visibility = std::clamp(sunDir.y, -threshold, 0.0f) / threshold + 1;
+
+
+
+        // Projection (perspective) matrix
+		glm::mat4 Prj = glm::perspective(
+            glm::radians(80.0f),                                        // Field of view
+			swapChainExtent.width / (float) swapChainExtent.height,     // Aspect ratio
+			0.1f, 200.0f                                                // Near and far planes
+        );
+		Prj[1][1] *= -1;    // Flip Y-axis to adapt to Vulkan convention
 	
-		// updates global uniforms
+
+
+		// Update global uniforms
 		VertexUniformBufferObject vubo{};
         vubo.model = glm::mat4(1.0f);
         vubo.view = player.getCamera().getMatrix();
         vubo.proj = Prj;
-
-        const float threshold = 0.75f;
-        float visibility = std::clamp(sunDir.y, -threshold, 0.0f) / threshold + 1;
 
         FragmentUniformBufferObject fubo{};        
         fubo.lightDir0 = sunDir;
@@ -501,16 +512,12 @@ private:
         fubo.ambient.y = player.isSwimming();
         fubo.eyeDir = player.getCamera().getDirection();
 
-        // std::cout << fubo.eyePos.x << ",\t" << fubo.eyePos.y << ",\t" << fubo.eyePos.z << std::endl;
-
 		void* data;
-		vkMapMemory(device, vertexUniformBuffersMemory[currentImage], 0,
-							sizeof(vubo), 0, &data);
+		vkMapMemory(device, vertexUniformBuffersMemory[currentImage], 0, sizeof(vubo), 0, &data);
 		memcpy(data, &vubo, sizeof(vubo));
 		vkUnmapMemory(device, vertexUniformBuffersMemory[currentImage]);
 
-        vkMapMemory(device, fragmentUniformBuffersMemory[currentImage], 0,
-            sizeof(fubo), 0, &data);
+        vkMapMemory(device, fragmentUniformBuffersMemory[currentImage], 0, sizeof(fubo), 0, &data);
         memcpy(data, &fubo, sizeof(fubo));
         vkUnmapMemory(device, fragmentUniformBuffersMemory[currentImage]);
 	}
@@ -675,7 +682,7 @@ private:
 
         VkApplicationInfo appInfo{};
         appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-        appInfo.pApplicationName = "Hello Triangle";
+        appInfo.pApplicationName = "Vulkraft";
         appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.pEngineName = "No Engine";
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);

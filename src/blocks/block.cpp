@@ -127,3 +127,15 @@ glm::vec2 Bush::getTextureOffset(Direction dir, glm::ivec3 corner) {
 	glm::vec2 blockOffset = BlockType::purge(dir, corner);
     return (fileOffset + blockOffset) * BlockType::textureSize;
 }
+
+glm::vec2 BlackWool::getTextureOffset(Direction dir, glm::ivec3 corner) {
+	glm::vec2 fileOffset(1, 7);
+	glm::vec2 blockOffset = BlockType::purge(dir, corner);
+    return (fileOffset + blockOffset) * BlockType::textureSize;
+}
+
+glm::vec2 WhiteWool::getTextureOffset(Direction dir, glm::ivec3 corner) {
+	glm::vec2 fileOffset(0, 4);
+	glm::vec2 blockOffset = BlockType::purge(dir, corner);
+    return (fileOffset + blockOffset) * BlockType::textureSize;
+}

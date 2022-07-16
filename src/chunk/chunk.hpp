@@ -1,8 +1,8 @@
 #pragma once
 
-#include "blocks/block.hpp"
-#include "structures/structure.hpp"
-#include "utils/perlin_noise.hpp"
+#include "../blocks/block.hpp"
+#include "../structures/structure.hpp"
+#include "../utils/perlin_noise.hpp"
 
 #include <map>
 #include <unordered_map>
@@ -85,6 +85,8 @@ class Chunk {
 		void initTerrain();
 
 		void initPlants();
+		
+		void initLogo();
 
     public:
         static siv::PerlinNoise::seed_type seed;

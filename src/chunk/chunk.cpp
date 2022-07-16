@@ -16,10 +16,10 @@
 
 #include <iostream>
 
-#include "blocks/block.hpp"
-#include "structures/structure.hpp"
-#include "utils/enums.hpp"
-#include "utils/perlin_noise.hpp"
+#include "../blocks/block.hpp"
+#include "../structures/structure.hpp"
+#include "../utils/enums.hpp"
+#include "../utils/perlin_noise.hpp"
 #include "chunk.hpp"
 
 siv::PerlinNoise::seed_type Chunk::seed = 0;
@@ -38,6 +38,8 @@ const Bedrock* BEDROCK = new Bedrock();
 const Leaves* LEAVES = new Leaves();
 const Water* WATER = new Water();
 const Bush* BUSH = new Bush();
+const BlackWool* BLACK_WOOL = new BlackWool();
+const WhiteWool* WHITE_WOOL = new WhiteWool();
 /* -------------------------  */
 
 Block::Block() {
@@ -267,10 +269,20 @@ void Chunk::initPlants() {
     }
 }
 
+void Chunk::initLogo() {
+    glm::ivec3 base(0, 200, 0);
+    StructureMeta meta;
+    Logo::generate(&meta, base);
+    buildStructure(&meta);
+}
+
 
 Chunk::Chunk(glm::ivec3 pos, const std::unordered_map<glm::ivec3, Chunk*>& m) : coordinates(pos), chunkMap(m) {
     initTerrain();
     initPlants();
+    if(pos == glm::ivec3(0)) {
+        initLogo();
+    }
 }
 
 Chunk::Chunk(int x, int y, int z, const std::unordered_map<glm::ivec3, Chunk*>& m) : Chunk(glm::ivec3(x, y, z), m) {}

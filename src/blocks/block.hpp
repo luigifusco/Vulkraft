@@ -29,7 +29,7 @@ class BlockType {
             return glm::vec3(
                 0.0f,       // Blend (boolean)
                 2.0f,       // Roughness
-                20.0f      // Specularity
+                20.0f       // Specularity
             );
         }
 
@@ -203,6 +203,28 @@ class Bush : public BlockType {
         }
 };
 
+class BlackWool : public BlockType {
+    public:
+        BlackWool() : BlockType(true, true, true) {};
+
+        glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
+
+        std::string toString() override {
+            return "BlackWool";
+        }
+};
+
+class WhiteWool : public BlockType {
+    public:
+        WhiteWool() : BlockType(true, true, true) {};
+
+        glm::vec2 getTextureOffset(Direction dir, glm::ivec3 corner) override;
+
+        std::string toString() override {
+            return "WhiteWool";
+        }
+};
+
 /* singleton block definition */
 extern const Air* AIR;
 extern const Dirt* DIRT;
@@ -216,4 +238,6 @@ extern const Bedrock* BEDROCK;
 extern const Leaves* LEAVES;
 extern const Water* WATER;
 extern const Bush* BUSH;
+extern const BlackWool* BLACK_WOOL;
+extern const WhiteWool* WHITE_WOOL;
 /* -------------------------  */

@@ -33,3 +33,195 @@ class Tree : public Structure {
     public:
         static void generate(StructureMeta* meta, glm::ivec3 base);
 };
+
+class Letter : public Structure {
+    protected:
+        static const int HEIGHT = 11;
+        static const int WIDTH = 8;
+
+        static void generateLetter(StructureMeta* meta, glm::ivec3 base, int description[HEIGHT][WIDTH]);
+
+    public:
+        static void generate(StructureMeta* meta, glm::ivec3 base);
+};
+
+class LetterV : public Letter {
+    private:
+        static inline int description[HEIGHT][WIDTH] = {
+            { 1, 1, 1, 1, 1, 1, 1, 1, },
+            { 1, 0, 0, 1, 1, 0, 0, 1, },
+            { 1, 0, 0, 1, 1, 0, 0, 1, },
+            { 1, 0, 0, 1, 1, 0, 0, 1, },
+            { 1, 0, 0, 1, 1, 0, 0, 1, },
+            { 1, 0, 0, 1, 1, 0, 0, 1, },
+            { 1, 0, 0, 1, 1, 0, 0, 1, },
+            { 1, 0, 0, 0, 0, 0, 0, 1, },
+            { 1, 1, 0, 0, 0, 0, 1, 1, },
+            { 1, 1, 1, 0, 0, 1, 1, 1, },
+            { 1, 1, 1, 1, 1, 1, 1, 1, },
+        };
+
+    public:
+        static void generate(StructureMeta* meta, glm::ivec3 base) {
+            generateLetter(meta, base, description);
+        }
+};
+
+class LetterU : public Letter {
+    private:
+        static inline int description[HEIGHT][WIDTH] = {
+            { 1, 1, 1, 1, 1, 1, 1, 1, },
+            { 1, 0, 0, 1, 1, 0, 0, 1, },
+            { 1, 0, 0, 1, 1, 0, 0, 1, },
+            { 1, 0, 0, 1, 1, 0, 0, 1, },
+            { 1, 0, 0, 1, 1, 0, 0, 1, },
+            { 1, 0, 0, 1, 1, 0, 0, 1, },
+            { 1, 0, 0, 1, 1, 0, 0, 1, },
+            { 1, 0, 0, 1, 1, 0, 0, 1, },
+            { 1, 0, 0, 0, 0, 0, 0, 1, },
+            { 1, 0, 0, 0, 0, 0, 0, 1, },
+            { 1, 1, 1, 1, 1, 1, 1, 1, },
+        };
+
+    public:
+        static void generate(StructureMeta* meta, glm::ivec3 base) {
+            generateLetter(meta, base, description);
+        }
+};
+
+class LetterL : public Letter {
+    private:
+        static inline int description[HEIGHT][WIDTH] = {
+            { 1, 1, 1, 1, 1, 1, 1, 1, },
+            { 1, 0, 0, 1, 1, 1, 1, 1, },
+            { 1, 0, 0, 1, 1, 1, 1, 1, },
+            { 1, 0, 0, 1, 1, 1, 1, 1, },
+            { 1, 0, 0, 1, 1, 1, 1, 1, },
+            { 1, 0, 0, 1, 1, 1, 1, 1, },
+            { 1, 0, 0, 1, 1, 1, 1, 1, },
+            { 1, 0, 0, 1, 1, 1, 1, 1, },
+            { 1, 0, 0, 0, 0, 0, 0, 1, },
+            { 1, 0, 0, 0, 0, 0, 0, 1, },
+            { 1, 1, 1, 1, 1, 1, 1, 1, },
+        };
+
+    public:
+        static void generate(StructureMeta* meta, glm::ivec3 base) {
+            generateLetter(meta, base, description);
+        }
+};
+
+class LetterK : public Letter {
+    private:
+        static inline int description[HEIGHT][WIDTH] = {
+            { 1, 1, 1, 1, 1, 1, 1, 1, },
+            { 1, 0, 0, 1, 1, 0, 0, 1, },
+            { 1, 0, 0, 1, 0, 0, 0, 1, },
+            { 1, 0, 0, 0, 0, 0, 1, 1, },
+            { 1, 0, 0, 0, 0, 1, 1, 1, },
+            { 1, 0, 0, 0, 1, 1, 1, 1, },
+            { 1, 0, 0, 0, 0, 1, 1, 1, },
+            { 1, 0, 0, 0, 0, 0, 1, 1, },
+            { 1, 0, 0, 1, 0, 0, 0, 1, },
+            { 1, 0, 0, 1, 1, 0, 0, 1, },
+            { 1, 1, 1, 1, 1, 1, 1, 1, },
+        };
+
+    public:
+        static void generate(StructureMeta* meta, glm::ivec3 base) {
+            generateLetter(meta, base, description);
+        }
+};
+
+class LetterR : public Letter {
+    private:
+        static inline int description[HEIGHT][WIDTH] = {
+            { 1, 1, 1, 1, 1, 1, 1, 1, },
+            { 1, 0, 0, 0, 0, 0, 0, 1, },
+            { 1, 0, 0, 0, 0, 0, 0, 1, },
+            { 1, 0, 0, 1, 1, 0, 0, 1, },
+            { 1, 0, 0, 1, 1, 0, 0, 1, },
+            { 1, 0, 0, 0, 0, 0, 0, 1, },
+            { 1, 0, 0, 0, 0, 0, 1, 1, },
+            { 1, 0, 0, 1, 1, 0, 0, 1, },
+            { 1, 0, 0, 1, 1, 0, 0, 1, },
+            { 1, 0, 0, 1, 1, 0, 0, 1, },
+            { 1, 1, 1, 1, 1, 1, 1, 1, },
+        };
+
+    public:
+        static void generate(StructureMeta* meta, glm::ivec3 base) {
+            generateLetter(meta, base, description);
+        }
+};
+
+class LetterA : public Letter {
+    private:
+        static inline int description[HEIGHT][WIDTH] = {
+            { 1, 1, 1, 1, 1, 1, 1, 1, },
+            { 1, 0, 0, 0, 0, 0, 0, 1, },
+            { 1, 0, 0, 0, 0, 0, 0, 1, },
+            { 1, 0, 0, 1, 1, 0, 0, 1, },
+            { 1, 0, 0, 1, 1, 0, 0, 1, },
+            { 1, 0, 0, 1, 1, 0, 0, 1, },
+            { 1, 0, 0, 0, 0, 0, 0, 1, },
+            { 1, 0, 0, 0, 0, 0, 0, 1, },
+            { 1, 0, 0, 1, 1, 0, 0, 1, },
+            { 1, 0, 0, 1, 1, 0, 0, 1, },
+            { 1, 1, 1, 1, 1, 1, 1, 1, },
+        };
+
+    public:
+        static void generate(StructureMeta* meta, glm::ivec3 base) {
+            generateLetter(meta, base, description);
+        }
+};
+
+class LetterF : public Letter {
+    private:
+        static inline int description[HEIGHT][WIDTH] = {
+            { 1, 1, 1, 1, 1, 1, 1, 1, },
+            { 1, 0, 0, 0, 0, 0, 0, 1, },
+            { 1, 0, 0, 0, 0, 0, 0, 1, },
+            { 1, 0, 0, 1, 1, 1, 1, 1, },
+            { 1, 0, 0, 1, 1, 1, 1, 1, },
+            { 1, 0, 0, 0, 0, 0, 0, 1, },
+            { 1, 0, 0, 0, 0, 0, 0, 1, },
+            { 1, 0, 0, 1, 1, 1, 1, 1, },
+            { 1, 0, 0, 1, 1, 1, 1, 1, },
+            { 1, 0, 0, 1, 1, 1, 1, 1, },
+            { 1, 1, 1, 1, 1, 1, 1, 1, },
+        };
+
+    public:
+        static void generate(StructureMeta* meta, glm::ivec3 base) {
+            generateLetter(meta, base, description);
+        }
+};
+
+class LetterT : public Letter {
+    private:
+        static inline int description[HEIGHT][WIDTH] = {
+            { 1, 1, 1, 1, 1, 1, 1, 1, },
+            { 1, 0, 0, 0, 0, 0, 0, 1, },
+            { 1, 0, 0, 0, 0, 0, 0, 1, },
+            { 1, 1, 1, 0, 0, 1, 1, 1, },
+            { 1, 1, 1, 0, 0, 1, 1, 1, },
+            { 1, 1, 1, 0, 0, 1, 1, 1, },
+            { 1, 1, 1, 0, 0, 1, 1, 1, },
+            { 1, 1, 1, 0, 0, 1, 1, 1, },
+            { 1, 1, 1, 0, 0, 1, 1, 1, },
+            { 1, 1, 1, 0, 0, 1, 1, 1, },
+            { 1, 1, 1, 1, 1, 1, 1, 1, },
+        };
+
+    public:
+        static void generate(StructureMeta* meta, glm::ivec3 base) {
+            generateLetter(meta, base, description);
+        }
+};
+
+class Logo : public Structure {
+    public:
+        static void generate(StructureMeta* meta, glm::ivec3 base);
+};
