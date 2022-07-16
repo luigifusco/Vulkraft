@@ -5,9 +5,9 @@
 ### Team members
 Name and Surname | Personal Code |            Email            | Github Username
 :---: |:-------------:|:---------------------------:| :---:
-Daniele Ferrazzo |       10608810       |              danielefarncesco.ferrazzo@mail.polimi.it              | @feDann
-Lorenzo Fratus |   10619073    | lorenzo1.fratus@mail.polimi.it | @lorenzofratus
-Luigi Fusco |   10601210    | luigi1.fusco@mail.polimi.it |        @luigifusco  
+Daniele Ferrazzo |       10608810       |              danielefrancesco.ferrazzo@mail.polimi.it              | [@feDann](https://github.com/feDann)
+Lorenzo Fratus |   10619073    | lorenzo1.fratus@mail.polimi.it | [@lorenzofratus](https://github.com/lorenzofratus)
+Luigi Fusco |   10601210    | luigi1.fusco@mail.polimi.it |        [@luigifusco](https://github.com/luigifusco) 
 
 ### Description
 The project consists in an implementation of a voxel based game taking inspiration from the popular *Minecraft* franchise.
@@ -39,8 +39,8 @@ which would pop them out of the block. As a failsafe mechanism, if the operation
 the player is teleported up into the sky.
 
 #### World editing
-Currently only block deletion is supported. The block the player is pointing at is found using a ray casting algorithm,
-which searches forward block by block until a breakable block is found. Breaking a block triggers an update of the chunk,
+Block deletion and block creation are supported. The block the player is pointing at is found using a ray casting algorithm,
+which searches forward block by block until a breakable block is found. Breaking or creating a block triggers an update of the chunk,
 of its graphics data and the one of neighboring chunks in the case of a border block.
 
 #### Custom vertex and fragment shaders
