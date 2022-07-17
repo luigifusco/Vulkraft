@@ -271,7 +271,7 @@ private:
         vkDeviceWaitIdle(device);
     }
 
-    bool handleMouseClick(std::unordered_set<glm::ivec3>* chunkIndexesToAdd) {
+    void handleMouseClick(std::unordered_set<glm::ivec3>* chunkIndexesToAdd, bool& shouldRedraw) {
         static bool leftPressed = false;
         static bool rightPressed = false;
 
@@ -279,8 +279,6 @@ private:
         bool leftUp = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE;
         bool rightDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
         bool rightUp = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_RELEASE;
-
-        bool shouldRedraw = false;
 
         if ((leftDown || rightDown) && !leftPressed && !rightPressed) {
             leftPressed = leftDown;
@@ -371,8 +369,6 @@ private:
             leftPressed = leftDown;
             rightPressed = rightDown;
         }
-
-        return shouldRedraw;
     }
 
     void updateUniformBuffer(uint32_t currentImage) {
@@ -419,7 +415,7 @@ private:
         if (!cursorEnabled) {
             player.cursorPositionEventListener(window);
             player.keyEventListener(window, deltaT);
-            shouldRedraw = handleMouseClick(&chunkIndexesToAdd);
+            handleMouseClick(&chunkIndexesToAdd, shouldRedraw);
         }
 
 
