@@ -1697,7 +1697,7 @@ private:
         if (!cursorEnabled) {
             player.cursorPositionEventListener(window);
             player.keyEventListener(window, deltaT);
-            shouldRedraw = handleMouseClicks(&chunkIndexesToAdd);
+            if(handleMouseClicks(&chunkIndexesToAdd)) shouldRedraw = true;
         }
 
         static std::unordered_set<Chunk*> toBuild;
@@ -2034,10 +2034,10 @@ private:
         if(!leftPressed && !rightPressed) {
             if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
                 leftPressed = true;
-                shouldRedraw = handleMouseClick(false, chunkIndexesToAdd);
+                if(handleMouseClick(false, chunkIndexesToAdd)) shouldRedraw = true;
             } else if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS) {
                 rightPressed = true;
-                shouldRedraw = handleMouseClick(true, chunkIndexesToAdd); 
+                if(handleMouseClick(true, chunkIndexesToAdd)) shouldRedraw = true; 
             }
         }
 
@@ -2174,13 +2174,6 @@ private:
 
         Chunk::setSeed(rand());
         chunkMap.insert(std::pair(baseChunkIndex, new Chunk(baseChunkIndex, chunkMap)));
-        
-        for (int i = -VIEW_RANGE; i <= VIEW_RANGE; ++i) {
-            for (int j = -VIEW_RANGE; j <= VIEW_RANGE; ++j) {
-                glm::ivec3 curChunkIndex(baseChunkIndex.x + i * CHUNK_WIDTH, baseChunkIndex.y, baseChunkIndex.z + j * CHUNK_DEPTH);
-                chunkMap.insert(std::pair(curChunkIndex, new Chunk(curChunkIndex, chunkMap)));
-            }
-        }
 
         for (auto& iter : chunkMap) {
             iter.second->build();
