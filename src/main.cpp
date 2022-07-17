@@ -44,6 +44,7 @@
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
+const char* TITLE = "Vulkraft";
 
 const std::string TEXTURE_PATH = "textures/blocks.png";
 
@@ -113,8 +114,7 @@ struct FragmentUniformBufferObject {
 class VulkraftApplication {
 public:
     void run() {
-        waterVertices.resize(1);
-        waterIndices.resize(3);
+        clearBuffers();
         initWindow();
         initVulkan();
         mainLoop();
@@ -169,12 +169,14 @@ private:
     std::vector<VkDeviceMemory> vertexBufferMemory;
     std::vector<VkBuffer> indexBuffer;
     std::vector<VkDeviceMemory> indexBufferMemory;
+
     std::vector<BlockVertex> waterVertices;
     std::vector<uint32_t> waterIndices;
     std::vector<VkBuffer> waterVertexBuffer;
     std::vector<VkDeviceMemory> waterVertexBufferMemory;
     std::vector<VkBuffer> waterIndexBuffer;
     std::vector<VkDeviceMemory> waterIndexBufferMemory;
+
     int curBuffer = 0;
 
     std::vector<VkBuffer> vertexUniformBuffers;
@@ -192,24 +194,25 @@ private:
     std::vector<VkFence> inFlightFences;
     uint32_t currentFrame = 0;
 
-
     glm::vec3 sunDir;
 
     bool framebufferResized = false;
     bool cursorEnabled = true;
-
 
     std::unordered_map<glm::ivec3, Chunk*> chunkMap;
 
     Camera camera{};
     Player player{std::ref(camera) , std::ref(chunkMap)};
 
+    const int VIEW_RANGE = 2;
+    const int ACTION_RANGE = 3;
+
     void initWindow() {
         glfwInit();
 
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-        window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkraft", nullptr, nullptr);
+        window = glfwCreateWindow(WIDTH, HEIGHT, TITLE, nullptr, nullptr);
         glfwSetWindowUserPointer(window, this);
         glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
     }
@@ -228,8 +231,8 @@ private:
         createSwapChain();
         createImageViews();
         createRenderPass();
-        createDescriptorSetLayout();
-        createGraphicsPipeline();
+        createDescriptorSetLayouts();
+        createPipelines();
         createCommandPool();
         createColorResources();
         createDepthResources();
@@ -248,438 +251,6 @@ private:
         createSyncObjects();
     }
 
-    void toggleCursor() {
-        if(cursorEnabled) {
-            cursorEnabled = false;
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-        } else {
-            cursorEnabled = true;
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-        }
-    }
-
-    void mainLoop() {
-        sunDir = glm::vec3(0, 1, 0);
-
-        toggleCursor();
-
-        while (!glfwWindowShouldClose(window)) {
-            glfwPollEvents();
-            drawFrame();
-        }
-
-        vkDeviceWaitIdle(device);
-    }
-
-    bool handleMouseClick(std::unordered_set<glm::ivec3>* chunkIndexesToAdd) {
-        static bool leftPressed = false;
-        static bool rightPressed = false;
-
-        bool leftDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
-        bool leftUp = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE;
-        bool rightDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
-        bool rightUp = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_RELEASE;
-
-        bool shouldRedraw = false;
-
-        if ((leftDown || rightDown) && !leftPressed && !rightPressed) {
-            leftPressed = leftDown;
-            rightPressed = rightDown;
-            shouldRedraw = true;
-
-            Camera camera = player.getCamera();
-            glm::vec3 position = camera.getPosition();
-            glm::vec3 direction = camera.getDirection() * -1.f;
-            glm::ivec3 target;
-            glm::vec3 norm;
-            bool hit = TraceRay::trace(
-                [&](glm::ivec3 position) -> bool {
-                    glm::ivec3 baseChunkIndex = Chunk::findChunkIndex(position);
-                    Chunk* chunk = chunkMap.find(baseChunkIndex)->second;
-                    return chunk->isBlockBreakableGlobal(position);
-                },
-                position, direction, 5, target, norm
-            );
-
-            if(hit) {
-                if(rightDown) target += norm;   // Target becomes the adjacent block on right click
-                glm::ivec3 baseChunkIndex = Chunk::findChunkIndex(target);
-                Chunk* chunk = chunkMap.find(baseChunkIndex)->second;
-                glm::ivec3 blockIndex = Chunk::findBlockIndex(target);
-                if((leftDown && chunk->destroyLocal(blockIndex)) || (rightDown && chunk->placeLocal(blockIndex))) { 
-                    chunkIndexesToAdd->insert(baseChunkIndex);
-                    std::vector<glm::ivec3> neighbors;
-                    bool checkWaterSpread = leftDown;   // Check water spread only when destroying
-                    if (chunk->isBlockWaterLocal(target + glm::ivec3(0, 1, 0))) {
-                        chunk->spreadWater(target);
-                        checkWaterSpread = false;
-                    }
-                    if (blockIndex.x == 0) {
-                        glm::ivec3 nearChunkIndex = baseChunkIndex - glm::ivec3(CHUNK_WIDTH, 0, 0);
-                        neighbors.push_back(nearChunkIndex);
-                        Chunk* neighbor = chunkMap.find(nearChunkIndex)->second;
-                        if (checkWaterSpread && (chunk->isBlockWaterLocal(target + glm::ivec3(1, 0, 0)) || neighbor->isBlockWaterLocal(target - glm::ivec3(1, 0, 0)))) {
-                            chunk->spreadWater(target);
-                            checkWaterSpread = false;
-                        }
-                    } else if (blockIndex.x == CHUNK_WIDTH - 1) {
-                        glm::ivec3 nearChunkIndex = baseChunkIndex + glm::ivec3(CHUNK_WIDTH, 0, 0);
-                        neighbors.push_back(nearChunkIndex);
-                        Chunk* neighbor = chunkMap.find(nearChunkIndex)->second;
-                        if (checkWaterSpread && (neighbor->isBlockWaterLocal(target + glm::ivec3(1, 0, 0)) || chunk->isBlockWaterLocal(target - glm::ivec3(1, 0, 0)))) {
-                            chunk->spreadWater(target);
-                            checkWaterSpread = false;
-                        }
-                    } else {
-                        if (checkWaterSpread && (chunk->isBlockWaterLocal(target + glm::ivec3(1, 0, 0)) || chunk->isBlockWaterLocal(target - glm::ivec3(1, 0, 0)))) {
-                            chunk->spreadWater(target);
-                            checkWaterSpread = false;
-                        }
-                    }
-                    if (blockIndex.z == 0) {
-                        glm::ivec3 nearChunkIndex = baseChunkIndex - glm::ivec3(0, 0, CHUNK_DEPTH);
-                        neighbors.push_back(nearChunkIndex);
-                        Chunk* neighbor = chunkMap.find(nearChunkIndex)->second;
-                        if (checkWaterSpread && (chunk->isBlockWaterLocal(target + glm::ivec3(0, 0, 1)) || neighbor->isBlockWaterLocal(target - glm::ivec3(0, 0, 1)))) {
-                            chunk->spreadWater(target);
-                            checkWaterSpread = false;
-                        }
-                    } else if (blockIndex.z == CHUNK_DEPTH - 1) {
-                        glm::ivec3 nearChunkIndex = baseChunkIndex + glm::ivec3(0, 0, CHUNK_DEPTH);
-                        neighbors.push_back(nearChunkIndex);
-                        Chunk* neighbor = chunkMap.find(nearChunkIndex)->second;
-                        if (checkWaterSpread && (neighbor->isBlockWaterLocal(target + glm::ivec3(0, 0, 1)) || chunk->isBlockWaterLocal(target - glm::ivec3(0, 0, 1)))) {
-                            chunk->spreadWater(target);
-                            checkWaterSpread = false;
-                        }
-                    } else {
-                        if (checkWaterSpread && (chunk->isBlockWaterLocal(target + glm::ivec3(0, 0, 1)) || chunk->isBlockWaterLocal(target - glm::ivec3(0, 0, 1)))) {
-                            chunk->spreadWater(target);
-                            checkWaterSpread = false;
-                        }
-                    }
-                    chunk->build();
-                    for (auto& index : neighbors) {
-                        auto iter = chunkMap.find(index);
-                        if (iter != chunkMap.end()) iter->second->build();
-                    }
-                }
-            }
-        }
-
-        if (leftUp || rightUp) {
-            leftPressed = leftDown;
-            rightPressed = rightDown;
-        }
-
-        return shouldRedraw;
-    }
-
-    void updateUniformBuffer(uint32_t currentImage) {
-		static auto startTime = std::chrono::high_resolution_clock::now();
-		static float lastTime = 0.0f;
-        static glm::ivec3 oldChunkIndex(0, 0, 0);
-		
-		auto currentTime = std::chrono::high_resolution_clock::now();
-		float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-		float deltaT = time - lastTime;
-		lastTime = time;
-					
-		static float debounce = time;
-
-        if (glfwGetKey(window, GLFW_KEY_ESCAPE)) {
-            if(time - debounce > 0.33) {
-                toggleCursor();
-                debounce = time;
-                framebufferResized = true;
-            }
-        }
-        if (glfwGetKey(window, GLFW_KEY_P)) {
-            if(time - debounce > 0.33) {
-                player.updatePhysics();
-                debounce = time;
-            }
-        }
-        if (glfwGetKey(window, GLFW_KEY_O)) {
-            if(time - debounce > 0.33) {
-                sunDir = glm::vec3(0.f, 1.f, 0.f);
-                debounce = time;
-            }
-        }
-        if (glfwGetKey(window, GLFW_KEY_I)) {
-            if(time - debounce > 0.33) {
-                sunDir = glm::vec3(0.f, -1.f, 0.f);
-                debounce = time;
-            }
-        }
-
-        static bool shouldRedraw = false;
-        static std::unordered_set<glm::ivec3> chunkIndexesToAdd;
-        
-        if (!cursorEnabled) {
-            player.cursorPositionEventListener(window);
-            player.keyEventListener(window, deltaT);
-            shouldRedraw = handleMouseClick(&chunkIndexesToAdd);
-        }
-
-
-        
-
-        static std::queue<glm::ivec3> toCreate;
-        static std::unordered_set<Chunk*> toBuild;
-
-
-        glm::ivec3 baseChunkIndex = Chunk::findChunkIndex(player.getCamera().getPosition());
-        const int CHUNK_RANGE = 2;
-        for (int i = -CHUNK_RANGE; i <= CHUNK_RANGE; ++i) {
-            for (int j = -CHUNK_RANGE; j <= CHUNK_RANGE; ++j) {
-                glm::ivec3 curChunkIndex(baseChunkIndex.x + i * CHUNK_WIDTH, baseChunkIndex.y, baseChunkIndex.z + j * CHUNK_DEPTH);
-                if (chunkMap.find(curChunkIndex) == chunkMap.end()) {
-                    if (chunkIndexesToAdd.find(curChunkIndex) == chunkIndexesToAdd.end()) {
-                        chunkIndexesToAdd.insert(curChunkIndex);
-                        Chunk* newChunk = new Chunk(curChunkIndex, chunkMap);
-                        chunkMap.insert({ curChunkIndex, newChunk });
-                        toBuild.insert(newChunk);
-                        std::vector<std::pair<glm::ivec3, Chunk*>> neighbors = newChunk->getNeighbors();
-                        for (auto& c : neighbors) {
-                            toBuild.insert(c.second);
-                        }
-                    }
-                }
-            }
-        }
-
-        if (oldChunkIndex != baseChunkIndex) {
-            oldChunkIndex = baseChunkIndex;
-            shouldRedraw = true;
-        }
-
-        bool hasBuilt = false;
-
-
-        if (!toBuild.empty()) {
-            auto curChunkIter = toBuild.begin();
-            Chunk* curChunk = *curChunkIter;
-            toBuild.erase(curChunkIter);
-            curChunk->build();
-            hasBuilt = true;
-            shouldRedraw = true;
-        }
-        if (shouldRedraw && !hasBuilt) {
-            drawVisibleChunks();
-            if (vertices.size()) {
-                curBuffer = (curBuffer + 1) % MAX_FRAMES_IN_FLIGHT;
-                updateVertexBuffer();
-                updateIndexBuffer();
-            }
-            shouldRedraw = false;
-        }
-
-
-
-        // Update sun (and moon) position, visibility is a [0,1] value used to shut the sun
-        // off when its below the horizon (1 - visibility is the equivalent for the moon)
-        const float SUN_SPEED = glm::radians(0.03f);
-        const float threshold = 0.75f;
-        sunDir = (glm::rotate(glm::mat4(1.0f), SUN_SPEED, glm::vec3(1, 0, 0)) * glm::vec4(sunDir, 1.0f));
-        float visibility = std::clamp(sunDir.y, -threshold, 0.0f) / threshold + 1;
-
-
-
-        //// Set uniform buffers fields
-
-        // Projection (perspective) matrix
-		glm::mat4 Prj = glm::perspective(
-            glm::radians(80.0f),                                        // Field of view
-			swapChainExtent.width / (float) swapChainExtent.height,     // Aspect ratio
-			0.1f, 200.0f                                                // Near and far planes
-        );
-		Prj[1][1] *= -1;    // Flip Y-axis to adapt to Vulkan convention
-    
-        // View matrix
-        glm::mat4 View = player.getCamera().getMatrix();
-
-        // World matrix (unused)
-        glm::mat4 World = glm::mat4(1.0f); 
-
-		VertexUniformBufferObject vubo{};
-        vubo.mvpMat = Prj * View * World;
-        vubo.mMat = World;
-        vubo.nMat = glm::inverse(glm::transpose(vubo.mMat));
-
-        FragmentUniformBufferObject fubo{};        
-        fubo.sunLightDir = glm::normalize(sunDir);
-        fubo.sunLightCol = glm::vec3(0.8f) * visibility;
-        fubo.moonLightDir = glm::normalize(sunDir * -1.0f);
-        fubo.moonLightCol = glm::vec3(0.1f) * (1 - visibility);
-        fubo.eyePos = player.getCamera().getPosition();
-        fubo.eyeDir = player.getCamera().getDirection();
-        fubo.ambientParams.x = visibility * 0.175 + (1 - visibility) * 0.025;
-        fubo.ambientParams.y = player.isSwimming();
-
-		void* data;
-		vkMapMemory(device, vertexUniformBuffersMemory[currentImage], 0, sizeof(vubo), 0, &data);
-		memcpy(data, &vubo, sizeof(vubo));
-		vkUnmapMemory(device, vertexUniformBuffersMemory[currentImage]);
-
-        vkMapMemory(device, fragmentUniformBuffersMemory[currentImage], 0, sizeof(fubo), 0, &data);
-        memcpy(data, &fubo, sizeof(fubo));
-        vkUnmapMemory(device, fragmentUniformBuffersMemory[currentImage]);
-	}
-
-    void drawChunk(Chunk* newChunk) {
-        std::vector<BlockVertex> curVertices = newChunk->getVertices();
-        std::vector<uint32_t> curIndices = newChunk->getIndices();
-
-        indices.reserve(indices.size() + curIndices.size());
-        for (int i = 0; i < curIndices.size(); ++i) {
-            indices.push_back(curIndices[i] + vertices.size());
-        }
-        vertices.insert(vertices.end(), curVertices.begin(), curVertices.end());
-
-        std::vector<BlockVertex> curWaterVertices = newChunk->getWaterVertices();
-        std::vector<uint32_t> curWaterIndices = newChunk->getWaterIndices();
-
-        waterIndices.reserve(waterIndices.size() + curWaterIndices.size());
-        for (int i = 0; i < curWaterIndices.size(); ++i) {
-            waterIndices.push_back(curWaterIndices[i] + waterVertices.size());
-        }
-        waterVertices.insert(waterVertices.end(), curWaterVertices.begin(), curWaterVertices.end());
-    }
-
-    void initializeChunks() {
-        Chunk::setSeed(rand());
-        chunkMap.insert(std::pair(glm::ivec3(0, 0, 0), new Chunk(0, 0, 0, chunkMap)));
-        for (auto& iter : chunkMap) {
-            iter.second->build();
-        }
-    }
-
-    void drawVisibleChunks() {
-        vertices.clear();
-        indices.clear();
-        waterVertices.clear();
-        waterIndices.clear();
-        waterVertices.resize(1);
-        waterIndices.resize(3);
-        std::vector<Chunk*> visibleChunks;
-        const int VIEW_RANGE = 2;
-        const glm::ivec3 baseChunkIndex = Chunk::findChunkIndex(player.getCamera().getPosition());
-        for (int i = -VIEW_RANGE; i <= VIEW_RANGE; ++i) {
-            for (int j = -VIEW_RANGE; j <= VIEW_RANGE; ++j) {
-                glm::ivec3 curChunkIndex(baseChunkIndex.x + i * CHUNK_WIDTH, baseChunkIndex.y, baseChunkIndex.z + j * CHUNK_DEPTH);
-                auto iter = chunkMap.find(curChunkIndex);
-                if (iter != chunkMap.end()) {
-                    visibleChunks.push_back(iter->second);
-                }
-            }
-        }
-        for (auto& iter : visibleChunks) {
-            drawChunk(iter);
-        }
-    }
-
-    void cleanupSwapChain() {
-        vkDestroyImageView(device, depthImageView, nullptr);
-        vkDestroyImage(device, depthImage, nullptr);
-        vkFreeMemory(device, depthImageMemory, nullptr);
-
-        vkDestroyImageView(device, colorImageView, nullptr);
-        vkDestroyImage(device, colorImage, nullptr);
-        vkFreeMemory(device, colorImageMemory, nullptr);
-
-        for (auto framebuffer : swapChainFramebuffers) {
-            vkDestroyFramebuffer(device, framebuffer, nullptr);
-        }
-
-        vkDestroyPipeline(device, graphicsPipeline, nullptr);
-        vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-        vkDestroyRenderPass(device, renderPass, nullptr);
-
-        for (auto imageView : swapChainImageViews) {
-            vkDestroyImageView(device, imageView, nullptr);
-        }
-
-        vkDestroySwapchainKHR(device, swapChain, nullptr);
-    }
-
-    void cleanup() {
-        cleanupSwapChain();
-
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            vkDestroyBuffer(device, vertexUniformBuffers[i], nullptr);
-            vkFreeMemory(device, vertexUniformBuffersMemory[i], nullptr);
-            vkDestroyBuffer(device, fragmentUniformBuffers[i], nullptr);
-            vkFreeMemory(device, fragmentUniformBuffersMemory[i], nullptr);
-        }
-
-        vkDestroyDescriptorPool(device, descriptorPool, nullptr);
-
-        vkDestroySampler(device, textureSampler, nullptr);
-        vkDestroyImageView(device, textureImageView, nullptr);
-
-        vkDestroyImage(device, textureImage, nullptr);
-        vkFreeMemory(device, textureImageMemory, nullptr);
-
-        vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
-
-        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
-            vkDestroyBuffer(device, indexBuffer[i], nullptr);
-            vkFreeMemory(device, indexBufferMemory[i], nullptr);
-
-            vkDestroyBuffer(device, vertexBuffer[i], nullptr);
-            vkFreeMemory(device, vertexBufferMemory[i], nullptr);
-
-            vkDestroyBuffer(device, waterIndexBuffer[i], nullptr);
-            vkFreeMemory(device, waterIndexBufferMemory[i], nullptr);
-
-            vkDestroyBuffer(device, waterVertexBuffer[i], nullptr);
-            vkFreeMemory(device, waterVertexBufferMemory[i], nullptr);
-        }
-
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
-            vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
-            vkDestroyFence(device, inFlightFences[i], nullptr);
-        }
-
-        vkDestroyCommandPool(device, commandPool, nullptr);
-
-        vkDestroyDevice(device, nullptr);
-
-        if (enableValidationLayers) {
-            DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
-        }
-
-        vkDestroySurfaceKHR(instance, surface, nullptr);
-        vkDestroyInstance(instance, nullptr);
-
-        glfwDestroyWindow(window);
-
-        glfwTerminate();
-    }
-
-    void recreateSwapChain() {
-        int width = 0, height = 0;
-        glfwGetFramebufferSize(window, &width, &height);
-        while (width == 0 || height == 0) {
-            glfwGetFramebufferSize(window, &width, &height);
-            glfwWaitEvents();
-        }
-
-        vkDeviceWaitIdle(device);
-
-        cleanupSwapChain();
-
-        createSwapChain();
-        createImageViews();
-        createRenderPass();
-        createGraphicsPipeline();
-        createColorResources();
-        createDepthResources();
-        createFramebuffers();
-    }
-
     void createInstance() {
         if (enableValidationLayers && !checkValidationLayerSupport()) {
             throw std::runtime_error("validation layers requested, but not available!");
@@ -687,7 +258,7 @@ private:
 
         VkApplicationInfo appInfo{};
         appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-        appInfo.pApplicationName = "Vulkraft";
+        appInfo.pApplicationName = TITLE;
         appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.pEngineName = "No Engine";
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
@@ -719,12 +290,62 @@ private:
         }
     }
 
+    std::vector<const char*> getRequiredExtensions() {
+        uint32_t glfwExtensionCount = 0;
+        const char** glfwExtensions;
+        glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+
+        std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+
+        if (enableValidationLayers) {
+            extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+        }
+
+        return extensions;
+    }
+
+    bool checkValidationLayerSupport() {
+        uint32_t layerCount;
+        vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+        std::vector<VkLayerProperties> availableLayers(layerCount);
+        vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+
+        for (const char* layerName : validationLayers) {
+            bool layerFound = false;
+
+            for (const auto& layerProperties : availableLayers) {
+                if (strcmp(layerName, layerProperties.layerName) == 0) {
+                    layerFound = true;
+                    break;
+                }
+            }
+
+            if (!layerFound) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo) {
         createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-        createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+        createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
         createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
         createInfo.pfnUserCallback = debugCallback;
+    }
+
+    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+        VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, 
+        VkDebugUtilsMessageTypeFlagsEXT messageType, 
+        const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, 
+        void* pUserData
+    ) {
+        std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
+
+        return VK_FALSE;
     }
 
     void setupDebugMessenger() {
@@ -766,6 +387,110 @@ private:
         if (physicalDevice == VK_NULL_HANDLE) {
             throw std::runtime_error("failed to find a suitable GPU!");
         }
+    }
+
+    bool isDeviceSuitable(VkPhysicalDevice device) {
+        QueueFamilyIndices indices = findQueueFamilies(device);
+
+        bool extensionsSupported = checkDeviceExtensionSupport(device);
+
+        bool swapChainAdequate = false;
+        if (extensionsSupported) {
+            SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device);
+            swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
+        }
+
+        VkPhysicalDeviceFeatures supportedFeatures;
+        vkGetPhysicalDeviceFeatures(device, &supportedFeatures);
+
+        return indices.isComplete() && extensionsSupported && swapChainAdequate  && supportedFeatures.samplerAnisotropy;
+    }
+
+    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) {
+        QueueFamilyIndices indices;
+
+        uint32_t queueFamilyCount = 0;
+        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+
+        std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
+        int i = 0;
+        for (const auto& queueFamily : queueFamilies) {
+            if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+                indices.graphicsFamily = i;
+            }
+
+            VkBool32 presentSupport = false;
+            vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
+
+            if (presentSupport) {
+                indices.presentFamily = i;
+            }
+
+            if (indices.isComplete()) {
+                break;
+            }
+
+            i++;
+        }
+
+        return indices;
+    }
+
+    bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
+        uint32_t extensionCount;
+        vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+
+        std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+        vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+
+        std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
+
+        for (const auto& extension : availableExtensions) {
+            requiredExtensions.erase(extension.extensionName);
+        }
+
+        return requiredExtensions.empty();
+    }
+
+    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device) {
+        SwapChainSupportDetails details;
+
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
+
+        uint32_t formatCount;
+        vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
+
+        if (formatCount != 0) {
+            details.formats.resize(formatCount);
+            vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formats.data());
+        }
+
+        uint32_t presentModeCount;
+        vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
+
+        if (presentModeCount != 0) {
+            details.presentModes.resize(presentModeCount);
+            vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, details.presentModes.data());
+        }
+
+        return details;
+    }
+
+    VkSampleCountFlagBits getMaxUsableSampleCount() {
+        VkPhysicalDeviceProperties physicalDeviceProperties;
+        vkGetPhysicalDeviceProperties(physicalDevice, &physicalDeviceProperties);
+
+        VkSampleCountFlags counts = physicalDeviceProperties.limits.framebufferColorSampleCounts & physicalDeviceProperties.limits.framebufferDepthSampleCounts;
+        if (counts & VK_SAMPLE_COUNT_64_BIT) { return VK_SAMPLE_COUNT_64_BIT; }
+        if (counts & VK_SAMPLE_COUNT_32_BIT) { return VK_SAMPLE_COUNT_32_BIT; }
+        if (counts & VK_SAMPLE_COUNT_16_BIT) { return VK_SAMPLE_COUNT_16_BIT; }
+        if (counts & VK_SAMPLE_COUNT_8_BIT) { return VK_SAMPLE_COUNT_8_BIT; }
+        if (counts & VK_SAMPLE_COUNT_4_BIT) { return VK_SAMPLE_COUNT_4_BIT; }
+        if (counts & VK_SAMPLE_COUNT_2_BIT) { return VK_SAMPLE_COUNT_2_BIT; }
+
+        return VK_SAMPLE_COUNT_1_BIT;
     }
 
     void createLogicalDevice() {
@@ -812,7 +537,7 @@ private:
         vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
         vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
     }
-
+    
     void createSwapChain() {
         SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice);
 
@@ -864,12 +589,71 @@ private:
         swapChainExtent = extent;
     }
 
+    VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
+        for (const auto& availableFormat : availableFormats) {
+            if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+                return availableFormat;
+            }
+        }
+
+        return availableFormats[0];
+    }
+    
+    VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) {
+        for (const auto& availablePresentMode : availablePresentModes) {
+            if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
+                return availablePresentMode;
+            }
+        }
+
+        return VK_PRESENT_MODE_FIFO_KHR;
+    }
+
+    VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
+        if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
+            return capabilities.currentExtent;
+        } else {
+            int width, height;
+            glfwGetFramebufferSize(window, &width, &height);
+
+            VkExtent2D actualExtent = {
+                static_cast<uint32_t>(width),
+                static_cast<uint32_t>(height)
+            };
+
+            actualExtent.width = std::clamp(actualExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
+            actualExtent.height = std::clamp(actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
+
+            return actualExtent;
+        }
+    }
+
     void createImageViews() {
         swapChainImageViews.resize(swapChainImages.size());
 
         for (uint32_t i = 0; i < swapChainImages.size(); i++) {
             swapChainImageViews[i] = createImageView(swapChainImages[i], swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
         }
+    }
+
+    VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels) {
+        VkImageViewCreateInfo viewInfo{};
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = image;
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.format = format;
+        viewInfo.subresourceRange.aspectMask = aspectFlags;
+        viewInfo.subresourceRange.baseMipLevel = 0;
+        viewInfo.subresourceRange.levelCount = mipLevels;
+        viewInfo.subresourceRange.baseArrayLayer = 0;
+        viewInfo.subresourceRange.layerCount = 1;
+
+        VkImageView imageView;
+        if (vkCreateImageView(device, &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create texture image view!");
+        }
+
+        return imageView;
     }
 
     void createRenderPass() {
@@ -944,6 +728,10 @@ private:
             throw std::runtime_error("failed to create render pass!");
         }
     }
+
+    void createDescriptorSetLayouts() {
+        createDescriptorSetLayout();
+    }
     
     void createDescriptorSetLayout() {
         VkDescriptorSetLayoutBinding vertexUboLayoutBinding{};
@@ -967,7 +755,6 @@ private:
         samplerLayoutBinding.pImmutableSamplers = nullptr;
         samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-
         std::array<VkDescriptorSetLayoutBinding, 3> bindings = {vertexUboLayoutBinding, fragmentUboLayoutBinding, samplerLayoutBinding};
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -977,6 +764,10 @@ private:
         if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
             throw std::runtime_error("failed to create descriptor set layout!");
         }
+    }    
+
+    void createPipelines() {
+        createGraphicsPipeline();
     }
 
     void createGraphicsPipeline() {
@@ -1112,6 +903,38 @@ private:
         vkDestroyShaderModule(device, vertShaderModule, nullptr);
     }
 
+    static std::vector<char> readFile(const std::string& filename) {
+        std::ifstream file(filename, std::ios::ate | std::ios::binary);
+
+        if (!file.is_open()) {
+            throw std::runtime_error("failed to open file!");
+        }
+
+        size_t fileSize = (size_t) file.tellg();
+        std::vector<char> buffer(fileSize);
+
+        file.seekg(0);
+        file.read(buffer.data(), fileSize);
+
+        file.close();
+
+        return buffer;
+    }
+
+    VkShaderModule createShaderModule(const std::vector<char>& code) {
+        VkShaderModuleCreateInfo createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        createInfo.codeSize = code.size();
+        createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+
+        VkShaderModule shaderModule;
+        if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create shader module!");
+        }
+
+        return shaderModule;
+    }
+
     void createFramebuffers() {
         swapChainFramebuffers.resize(swapChainImageViews.size());
 
@@ -1136,7 +959,7 @@ private:
             }
         }
     }
-
+    
     void createCommandPool() {
         QueueFamilyIndices queueFamilyIndices = findQueueFamilies(physicalDevice);
 
@@ -1163,6 +986,14 @@ private:
         createImage(swapChainExtent.width, swapChainExtent.height, 1, msaaSamples, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory);
         depthImageView = createImageView(depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
     }
+    
+    VkFormat findDepthFormat() {
+        return findSupportedFormat(
+            {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+        );
+    }
 
     VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {
         for (VkFormat format : candidates) {
@@ -1179,18 +1010,10 @@ private:
         throw std::runtime_error("failed to find supported format!");
     }
 
-    VkFormat findDepthFormat() {
-        return findSupportedFormat(
-            {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
-            VK_IMAGE_TILING_OPTIMAL,
-            VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
-        );
-    }
-
     bool hasStencilComponent(VkFormat format) {
         return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
     }
-
+    
     void createTextureImage() {
         int texWidth, texHeight, texChannels;
         stbi_uc* pixels = stbi_load(TEXTURE_PATH.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
@@ -1311,72 +1134,6 @@ private:
         endSingleTimeCommands(commandBuffer);
     }
 
-    VkSampleCountFlagBits getMaxUsableSampleCount() {
-        VkPhysicalDeviceProperties physicalDeviceProperties;
-        vkGetPhysicalDeviceProperties(physicalDevice, &physicalDeviceProperties);
-
-        VkSampleCountFlags counts = physicalDeviceProperties.limits.framebufferColorSampleCounts & physicalDeviceProperties.limits.framebufferDepthSampleCounts;
-        if (counts & VK_SAMPLE_COUNT_64_BIT) { return VK_SAMPLE_COUNT_64_BIT; }
-        if (counts & VK_SAMPLE_COUNT_32_BIT) { return VK_SAMPLE_COUNT_32_BIT; }
-        if (counts & VK_SAMPLE_COUNT_16_BIT) { return VK_SAMPLE_COUNT_16_BIT; }
-        if (counts & VK_SAMPLE_COUNT_8_BIT) { return VK_SAMPLE_COUNT_8_BIT; }
-        if (counts & VK_SAMPLE_COUNT_4_BIT) { return VK_SAMPLE_COUNT_4_BIT; }
-        if (counts & VK_SAMPLE_COUNT_2_BIT) { return VK_SAMPLE_COUNT_2_BIT; }
-
-        return VK_SAMPLE_COUNT_1_BIT;
-    }
-
-    void createTextureImageView() {
-        textureImageView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels);
-    }
-
-    void createTextureSampler() {
-        VkPhysicalDeviceProperties properties{};
-        vkGetPhysicalDeviceProperties(physicalDevice, &properties);
-
-        VkSamplerCreateInfo samplerInfo{};
-        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-        samplerInfo.magFilter = VK_FILTER_NEAREST;
-        samplerInfo.minFilter = VK_FILTER_NEAREST;
-        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.anisotropyEnable = VK_TRUE;
-        samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
-        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-        samplerInfo.unnormalizedCoordinates = VK_FALSE;
-        samplerInfo.compareEnable = VK_FALSE;
-        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        samplerInfo.minLod = 0.0f;
-        samplerInfo.maxLod = static_cast<float>(mipLevels);
-        samplerInfo.mipLodBias = 0.0f;
-
-        if (vkCreateSampler(device, &samplerInfo, nullptr, &textureSampler) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create texture sampler!");
-        }
-    }
-
-    VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels) {
-        VkImageViewCreateInfo viewInfo{};
-        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        viewInfo.image = image;
-        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        viewInfo.format = format;
-        viewInfo.subresourceRange.aspectMask = aspectFlags;
-        viewInfo.subresourceRange.baseMipLevel = 0;
-        viewInfo.subresourceRange.levelCount = mipLevels;
-        viewInfo.subresourceRange.baseArrayLayer = 0;
-        viewInfo.subresourceRange.layerCount = 1;
-
-        VkImageView imageView;
-        if (vkCreateImageView(device, &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create texture image view!");
-        }
-
-        return imageView;
-    }
-
     void createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory) {
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -1482,6 +1239,37 @@ private:
         endSingleTimeCommands(commandBuffer);
     }
 
+    void createTextureImageView() {
+        textureImageView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels);
+    }
+
+    void createTextureSampler() {
+        VkPhysicalDeviceProperties properties{};
+        vkGetPhysicalDeviceProperties(physicalDevice, &properties);
+
+        VkSamplerCreateInfo samplerInfo{};
+        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        samplerInfo.magFilter = VK_FILTER_NEAREST;
+        samplerInfo.minFilter = VK_FILTER_NEAREST;
+        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.anisotropyEnable = VK_TRUE;
+        samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+        samplerInfo.unnormalizedCoordinates = VK_FALSE;
+        samplerInfo.compareEnable = VK_FALSE;
+        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = static_cast<float>(mipLevels);
+        samplerInfo.mipLodBias = 0.0f;
+
+        if (vkCreateSampler(device, &samplerInfo, nullptr, &textureSampler) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create texture sampler!");
+        }
+    }
+
     void createVertexBuffer() {
         VkDeviceSize bufferSize = sizeof(BlockVertex) * vertices.size();
 
@@ -1527,43 +1315,86 @@ private:
         }
     }
 
-    void updateVertexBuffer() {
-        VkDeviceSize bufferSize = sizeof(BlockVertex) * vertices.size();
+    void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
+        VkBufferCreateInfo bufferInfo{};
+        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        bufferInfo.size = size;
+        bufferInfo.usage = usage;
+        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-        VkBuffer stagingBuffer;
-        VkDeviceMemory stagingBufferMemory;
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-        void* data;
-        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-        memcpy(data, vertices.data(), (size_t)bufferSize);
-        vkUnmapMemory(device, stagingBufferMemory);
+        if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create buffer!");
+        }
 
-        vkDestroyBuffer(device, vertexBuffer[curBuffer], nullptr);
-        vkFreeMemory(device, vertexBufferMemory[curBuffer], nullptr);
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer[curBuffer], vertexBufferMemory[curBuffer]);
-        
-        copyBuffer(stagingBuffer, vertexBuffer[curBuffer], bufferSize);
+        VkMemoryRequirements memRequirements;
+        vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
 
-        vkDestroyBuffer(device, stagingBuffer, nullptr);
-        vkFreeMemory(device, stagingBufferMemory, nullptr);
+        VkMemoryAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        allocInfo.allocationSize = memRequirements.size;
+        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
 
+        if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+            throw std::runtime_error("failed to allocate buffer memory!");
+        }
 
+        vkBindBufferMemory(device, buffer, bufferMemory, 0);
+    }
 
-        bufferSize = sizeof(BlockVertex) * waterVertices.size();
+    uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+        VkPhysicalDeviceMemoryProperties memProperties;
+        vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
 
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-        memcpy(data, waterVertices.data(), (size_t)bufferSize);
-        vkUnmapMemory(device, stagingBufferMemory);
+        for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+            if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+                return i;
+            }
+        }
 
-        vkDestroyBuffer(device, waterVertexBuffer[curBuffer], nullptr);
-        vkFreeMemory(device, waterVertexBufferMemory[curBuffer], nullptr);
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, waterVertexBuffer[curBuffer], waterVertexBufferMemory[curBuffer]);
+        throw std::runtime_error("failed to find suitable memory type!");
+    }
 
-        copyBuffer(stagingBuffer, waterVertexBuffer[curBuffer], bufferSize);
+    void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
+        VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
-        vkDestroyBuffer(device, stagingBuffer, nullptr);
-        vkFreeMemory(device, stagingBufferMemory, nullptr);
+        VkBufferCopy copyRegion{};
+        copyRegion.size = size;
+        vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+
+        endSingleTimeCommands(commandBuffer);
+    }
+
+    VkCommandBuffer beginSingleTimeCommands() {
+        VkCommandBufferAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandPool = commandPool;
+        allocInfo.commandBufferCount = 1;
+
+        VkCommandBuffer commandBuffer;
+        vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer);
+
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+        vkBeginCommandBuffer(commandBuffer, &beginInfo);
+
+        return commandBuffer;
+    }
+
+    void endSingleTimeCommands(VkCommandBuffer commandBuffer) {
+        vkEndCommandBuffer(commandBuffer);
+
+        VkSubmitInfo submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &commandBuffer;
+
+        vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+        vkQueueWaitIdle(graphicsQueue);
+
+        vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
     }
 
     void createIndexBuffer() {
@@ -1613,46 +1444,6 @@ private:
         }
     }
 
-    void updateIndexBuffer() {
-        VkDeviceSize bufferSize = sizeof(uint32_t) * indices.size();
-
-        VkBuffer stagingBuffer;
-        VkDeviceMemory stagingBufferMemory;
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-
-        void* data;
-        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-        memcpy(data, indices.data(), (size_t)bufferSize);
-        vkUnmapMemory(device, stagingBufferMemory);
-
-        vkDestroyBuffer(device, indexBuffer[curBuffer], nullptr);
-        vkFreeMemory(device, indexBufferMemory[curBuffer], nullptr);
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer[curBuffer], indexBufferMemory[curBuffer]);
-
-        copyBuffer(stagingBuffer, indexBuffer[curBuffer], bufferSize);
-
-        vkDestroyBuffer(device, stagingBuffer, nullptr);
-        vkFreeMemory(device, stagingBufferMemory, nullptr);
-
-
-        bufferSize = sizeof(uint32_t) * waterIndices.size();
-
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-
-        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-        memcpy(data, waterIndices.data(), (size_t)bufferSize);
-        vkUnmapMemory(device, stagingBufferMemory);
-
-        vkDestroyBuffer(device, waterIndexBuffer[curBuffer], nullptr);
-        vkFreeMemory(device, waterIndexBufferMemory[curBuffer], nullptr);
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, waterIndexBuffer[curBuffer], waterIndexBufferMemory[curBuffer]);
-
-        copyBuffer(stagingBuffer, waterIndexBuffer[curBuffer], bufferSize);
-
-        vkDestroyBuffer(device, stagingBuffer, nullptr);
-        vkFreeMemory(device, stagingBufferMemory, nullptr);
-    }
-
     void createUniformBuffers() {
         VkDeviceSize vertexBufferSize = sizeof(VertexUniformBufferObject);
         VkDeviceSize fragmentBufferSize = sizeof(FragmentUniformBufferObject);
@@ -1689,7 +1480,12 @@ private:
     }
 
     void createDescriptorSets() {
+        createDescriptorSet();
+    }
+
+    void createDescriptorSet() {
         std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
+
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         allocInfo.descriptorPool = descriptorPool;
@@ -1747,88 +1543,6 @@ private:
         }
     }
 
-    void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
-        VkBufferCreateInfo bufferInfo{};
-        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        bufferInfo.size = size;
-        bufferInfo.usage = usage;
-        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-        if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create buffer!");
-        }
-
-        VkMemoryRequirements memRequirements;
-        vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
-
-        VkMemoryAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
-
-        if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
-            throw std::runtime_error("failed to allocate buffer memory!");
-        }
-
-        vkBindBufferMemory(device, buffer, bufferMemory, 0);
-    }
-
-    VkCommandBuffer beginSingleTimeCommands() {
-        VkCommandBufferAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandPool = commandPool;
-        allocInfo.commandBufferCount = 1;
-
-        VkCommandBuffer commandBuffer;
-        vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer);
-
-        VkCommandBufferBeginInfo beginInfo{};
-        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-        vkBeginCommandBuffer(commandBuffer, &beginInfo);
-
-        return commandBuffer;
-    }
-
-    void endSingleTimeCommands(VkCommandBuffer commandBuffer) {
-        vkEndCommandBuffer(commandBuffer);
-
-        VkSubmitInfo submitInfo{};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &commandBuffer;
-
-        vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-        vkQueueWaitIdle(graphicsQueue);
-
-        vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
-    }
-
-    void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
-        VkCommandBuffer commandBuffer = beginSingleTimeCommands();
-
-        VkBufferCopy copyRegion{};
-        copyRegion.size = size;
-        vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
-
-        endSingleTimeCommands(commandBuffer);
-    }
-
-    uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
-        VkPhysicalDeviceMemoryProperties memProperties;
-        vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
-
-        for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
-            if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
-                return i;
-            }
-        }
-
-        throw std::runtime_error("failed to find suitable memory type!");
-    }
-
     void createCommandBuffers() {
         commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
 
@@ -1840,65 +1554,6 @@ private:
 
         if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
             throw std::runtime_error("failed to allocate command buffers!");
-        }
-    }
-
-    void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, int currentFrame) {
-        VkCommandBufferBeginInfo beginInfo{};
-        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-        if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
-            throw std::runtime_error("failed to begin recording command buffer!");
-        }
-
-        VkRenderPassBeginInfo renderPassInfo{};
-        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        renderPassInfo.renderPass = renderPass;
-        renderPassInfo.framebuffer = swapChainFramebuffers[imageIndex];
-        renderPassInfo.renderArea.offset = {0, 0};
-        renderPassInfo.renderArea.extent = swapChainExtent;
-
-        const glm::vec3 DAY = glm::vec3(45.f, 197.f, 231.f) / 255.f;
-        const glm::vec3 NIGHT = glm::vec3(1.f, 1.f, 8.f) / 255.f;
-
-        float ratio = (std::clamp(sunDir.y, -0.75f, 0.75f) + 0.75f) / 1.5f;
-        glm::vec3 finalColor = DAY * ratio + NIGHT * (1 - ratio);
-
-        std::array<VkClearValue, 2> clearValues{};
-        clearValues[0].color = {{finalColor.x, finalColor.y, finalColor.z, 1.0f}};
-        clearValues[1].depthStencil = {1.0f, 0};
-
-        renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-        renderPassInfo.pClearValues = clearValues.data();
-
-        vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-
-            VkBuffer vertexBuffers[] = {vertexBuffer[curBuffer]};
-            VkDeviceSize offsets[] = {0};
-            vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-
-            vkCmdBindIndexBuffer(commandBuffer, indexBuffer[curBuffer], 0, VK_INDEX_TYPE_UINT32);
-
-            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
-
-            vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
-
-
-
-            VkBuffer waterVertexBuffers[] = {waterVertexBuffer[curBuffer]};
-            VkDeviceSize waterOffsets[] = { 0 };
-            vkCmdBindVertexBuffers(commandBuffer, 0, 1, waterVertexBuffers, waterOffsets);
-
-            vkCmdBindIndexBuffer(commandBuffer, waterIndexBuffer[curBuffer], 0, VK_INDEX_TYPE_UINT32);
-
-            vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(waterIndices.size()), 1, 0, 0, 0);
-
-        vkCmdEndRenderPass(commandBuffer);
-
-        if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-            throw std::runtime_error("failed to record command buffer!");
         }
     }
 
@@ -1921,6 +1576,18 @@ private:
                 throw std::runtime_error("failed to create synchronization objects for a frame!");
             }
         }
+    }
+
+    void mainLoop() {
+        setTimeNoon();
+        toggleCursor();
+
+        while (!glfwWindowShouldClose(window)) {
+            glfwPollEvents();
+            drawFrame();
+        }
+
+        vkDeviceWaitIdle(device);
     }
 
     void drawFrame() {
@@ -1987,209 +1654,589 @@ private:
         currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
 
-    VkShaderModule createShaderModule(const std::vector<char>& code) {
-        VkShaderModuleCreateInfo createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-        createInfo.codeSize = code.size();
-        createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+    void updateUniformBuffer(uint32_t currentImage) {
+		static auto startTime = std::chrono::high_resolution_clock::now();
+		static float lastTime = 0.0f;
+		
+		auto currentTime = std::chrono::high_resolution_clock::now();
+		float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+		float deltaT = time - lastTime;
+		lastTime = time;
+					
+		static float debounce = time;
 
-        VkShaderModule shaderModule;
-        if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create shader module!");
+        if (glfwGetKey(window, GLFW_KEY_ESCAPE)) {
+            if(time - debounce > 0.33) {
+                toggleCursor();
+                debounce = time;
+                framebufferResized = true;
+            }
         }
-
-        return shaderModule;
-    }
-
-    VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
-        for (const auto& availableFormat : availableFormats) {
-            if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-                return availableFormat;
+        if (glfwGetKey(window, GLFW_KEY_P)) {
+            if(time - debounce > 0.33) {
+                player.updatePhysics();
+                debounce = time;
+            }
+        }
+        if (glfwGetKey(window, GLFW_KEY_O)) {
+            if(time - debounce > 0.33) {
+                sunDir = glm::vec3(0.f, 1.f, 0.f);
+                debounce = time;
+            }
+        }
+        if (glfwGetKey(window, GLFW_KEY_I)) {
+            if(time - debounce > 0.33) {
+                sunDir = glm::vec3(0.f, -1.f, 0.f);
+                debounce = time;
             }
         }
 
-        return availableFormats[0];
-    }
-
-    VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) {
-        for (const auto& availablePresentMode : availablePresentModes) {
-            if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
-                return availablePresentMode;
-            }
+        static bool shouldRedraw = false;
+        static std::unordered_set<glm::ivec3> chunkIndexesToAdd;
+        
+        if (!cursorEnabled) {
+            player.cursorPositionEventListener(window);
+            player.keyEventListener(window, deltaT);
+            shouldRedraw = handleMouseClicks(&chunkIndexesToAdd);
         }
 
-        return VK_PRESENT_MODE_FIFO_KHR;
+        static std::unordered_set<Chunk*> toBuild;
+        if(loadNewVisibleChunks(&chunkIndexesToAdd, &toBuild)) {
+            shouldRedraw = true;
+        }
+
+        if(buildNextChunk(&toBuild)) {
+            shouldRedraw = true;
+        } else if(shouldRedraw) {
+            drawVisibleChunks();
+            if (vertices.size()) {
+                curBuffer = (curBuffer + 1) % MAX_FRAMES_IN_FLIGHT;
+                updateVertexBuffer();
+                updateIndexBuffer();
+            }
+            shouldRedraw = false;
+        }
+
+        // Update sun (and moon) position, visibility is a [0,1] value used to switch the sun
+        // (moon) off when it's below the horizon (1 - visibility is the equivalent for the moon)
+        const float SUN_SPEED = glm::radians(0.03f);
+        const float threshold = 0.75f;
+        sunDir = (glm::rotate(glm::mat4(1.0f), SUN_SPEED, glm::vec3(1, 0, 0)) * glm::vec4(sunDir, 1.0f));
+        float visibility = std::clamp(sunDir.y, -threshold, 0.0f) / threshold + 1;
+
+        // Projection (perspective) matrix
+		glm::mat4 Prj = glm::perspective(
+            glm::radians(80.0f),                                        // Field of view
+			swapChainExtent.width / (float) swapChainExtent.height,     // Aspect ratio
+			0.1f, 200.0f                                                // Near and far planes
+        );
+		Prj[1][1] *= -1;    // Flip Y-axis to adapt to Vulkan convention
+    
+        // View matrix
+        glm::mat4 View = player.getCamera().getMatrix();
+
+        // World matrix (unused)
+        glm::mat4 World = glm::mat4(1.0f); 
+
+		VertexUniformBufferObject vubo{};
+        vubo.mvpMat = Prj * View * World;
+        vubo.mMat = World;
+        vubo.nMat = glm::inverse(glm::transpose(vubo.mMat));
+
+        FragmentUniformBufferObject fubo{};        
+        fubo.sunLightDir = glm::normalize(sunDir);
+        fubo.sunLightCol = glm::vec3(0.8f) * visibility;
+        fubo.moonLightDir = glm::normalize(sunDir * -1.0f);
+        fubo.moonLightCol = glm::vec3(0.1f) * (1 - visibility);
+        fubo.eyePos = player.getCamera().getPosition();
+        fubo.eyeDir = player.getCamera().getDirection();
+        fubo.ambientParams.x = visibility * 0.175 + (1 - visibility) * 0.025;
+        fubo.ambientParams.y = player.isSwimming();
+
+		void* data;
+		vkMapMemory(device, vertexUniformBuffersMemory[currentImage], 0, sizeof(vubo), 0, &data);
+		memcpy(data, &vubo, sizeof(vubo));
+		vkUnmapMemory(device, vertexUniformBuffersMemory[currentImage]);
+
+        vkMapMemory(device, fragmentUniformBuffersMemory[currentImage], 0, sizeof(fubo), 0, &data);
+        memcpy(data, &fubo, sizeof(fubo));
+        vkUnmapMemory(device, fragmentUniformBuffersMemory[currentImage]);
+	}
+
+    void updateVertexBuffer() {
+        VkDeviceSize bufferSize = sizeof(BlockVertex) * vertices.size();
+
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingBufferMemory;
+        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+        void* data;
+        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+        memcpy(data, vertices.data(), (size_t)bufferSize);
+        vkUnmapMemory(device, stagingBufferMemory);
+
+        vkDestroyBuffer(device, vertexBuffer[curBuffer], nullptr);
+        vkFreeMemory(device, vertexBufferMemory[curBuffer], nullptr);
+        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer[curBuffer], vertexBufferMemory[curBuffer]);
+        
+        copyBuffer(stagingBuffer, vertexBuffer[curBuffer], bufferSize);
+
+        vkDestroyBuffer(device, stagingBuffer, nullptr);
+        vkFreeMemory(device, stagingBufferMemory, nullptr);
+
+        bufferSize = sizeof(BlockVertex) * waterVertices.size();
+
+        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+        memcpy(data, waterVertices.data(), (size_t)bufferSize);
+        vkUnmapMemory(device, stagingBufferMemory);
+
+        vkDestroyBuffer(device, waterVertexBuffer[curBuffer], nullptr);
+        vkFreeMemory(device, waterVertexBufferMemory[curBuffer], nullptr);
+        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, waterVertexBuffer[curBuffer], waterVertexBufferMemory[curBuffer]);
+
+        copyBuffer(stagingBuffer, waterVertexBuffer[curBuffer], bufferSize);
+
+        vkDestroyBuffer(device, stagingBuffer, nullptr);
+        vkFreeMemory(device, stagingBufferMemory, nullptr);
     }
 
-    VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
-        if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
-            return capabilities.currentExtent;
-        } else {
-            int width, height;
+    void updateIndexBuffer() {
+        VkDeviceSize bufferSize = sizeof(uint32_t) * indices.size();
+
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingBufferMemory;
+        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+        void* data;
+        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+        memcpy(data, indices.data(), (size_t)bufferSize);
+        vkUnmapMemory(device, stagingBufferMemory);
+
+        vkDestroyBuffer(device, indexBuffer[curBuffer], nullptr);
+        vkFreeMemory(device, indexBufferMemory[curBuffer], nullptr);
+        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer[curBuffer], indexBufferMemory[curBuffer]);
+
+        copyBuffer(stagingBuffer, indexBuffer[curBuffer], bufferSize);
+
+        vkDestroyBuffer(device, stagingBuffer, nullptr);
+        vkFreeMemory(device, stagingBufferMemory, nullptr);
+
+        bufferSize = sizeof(uint32_t) * waterIndices.size();
+
+        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+        memcpy(data, waterIndices.data(), (size_t)bufferSize);
+        vkUnmapMemory(device, stagingBufferMemory);
+
+        vkDestroyBuffer(device, waterIndexBuffer[curBuffer], nullptr);
+        vkFreeMemory(device, waterIndexBufferMemory[curBuffer], nullptr);
+        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, waterIndexBuffer[curBuffer], waterIndexBufferMemory[curBuffer]);
+
+        copyBuffer(stagingBuffer, waterIndexBuffer[curBuffer], bufferSize);
+
+        vkDestroyBuffer(device, stagingBuffer, nullptr);
+        vkFreeMemory(device, stagingBufferMemory, nullptr);
+    }
+    
+    void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, int currentFrame) {
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+        if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+            throw std::runtime_error("failed to begin recording command buffer!");
+        }
+
+        VkRenderPassBeginInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = renderPass;
+        renderPassInfo.framebuffer = swapChainFramebuffers[imageIndex];
+        renderPassInfo.renderArea.offset = {0, 0};
+        renderPassInfo.renderArea.extent = swapChainExtent;
+
+        const glm::vec3 DAY = glm::vec3(45.f, 197.f, 231.f) / 255.f;
+        const glm::vec3 NIGHT = glm::vec3(1.f, 1.f, 8.f) / 255.f;
+
+        float ratio = (std::clamp(sunDir.y, -0.75f, 0.75f) + 0.75f) / 1.5f;
+        glm::vec3 finalColor = DAY * ratio + NIGHT * (1 - ratio);
+
+        std::array<VkClearValue, 2> clearValues{};
+        clearValues[0].color = {{finalColor.x, finalColor.y, finalColor.z, 1.0f}};
+        clearValues[1].depthStencil = {1.0f, 0};
+
+        renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+        renderPassInfo.pClearValues = clearValues.data();
+
+        vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+            VkBuffer vertexBuffers[] = {vertexBuffer[curBuffer]};
+            VkDeviceSize offsets[] = {0};
+            vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+
+            vkCmdBindIndexBuffer(commandBuffer, indexBuffer[curBuffer], 0, VK_INDEX_TYPE_UINT32);
+
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
+
+            vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+
+
+
+            VkBuffer waterVertexBuffers[] = {waterVertexBuffer[curBuffer]};
+            VkDeviceSize waterOffsets[] = { 0 };
+            vkCmdBindVertexBuffers(commandBuffer, 0, 1, waterVertexBuffers, waterOffsets);
+
+            vkCmdBindIndexBuffer(commandBuffer, waterIndexBuffer[curBuffer], 0, VK_INDEX_TYPE_UINT32);
+
+            vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(waterIndices.size()), 1, 0, 0, 0);
+
+        vkCmdEndRenderPass(commandBuffer);
+
+        if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+            throw std::runtime_error("failed to record command buffer!");
+        }
+    }
+
+    void recreateSwapChain() {
+        int width = 0, height = 0;
+        glfwGetFramebufferSize(window, &width, &height);
+
+        while (width == 0 || height == 0) {
             glfwGetFramebufferSize(window, &width, &height);
-
-            VkExtent2D actualExtent = {
-                static_cast<uint32_t>(width),
-                static_cast<uint32_t>(height)
-            };
-
-            actualExtent.width = std::clamp(actualExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
-            actualExtent.height = std::clamp(actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
-
-            return actualExtent;
+            glfwWaitEvents();
         }
+
+        vkDeviceWaitIdle(device);
+
+        cleanupSwapChain();
+
+        createSwapChain();
+        createImageViews();
+        createRenderPass();
+        createPipelines();
+        createColorResources();
+        createDepthResources();
+        createFramebuffers();
     }
 
-    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device) {
-        SwapChainSupportDetails details;
+    void cleanupSwapChain() {
+        vkDestroyImageView(device, depthImageView, nullptr);
+        vkDestroyImage(device, depthImage, nullptr);
+        vkFreeMemory(device, depthImageMemory, nullptr);
 
-        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
+        vkDestroyImageView(device, colorImageView, nullptr);
+        vkDestroyImage(device, colorImage, nullptr);
+        vkFreeMemory(device, colorImageMemory, nullptr);
 
-        uint32_t formatCount;
-        vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
-
-        if (formatCount != 0) {
-            details.formats.resize(formatCount);
-            vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formats.data());
+        for (auto framebuffer : swapChainFramebuffers) {
+            vkDestroyFramebuffer(device, framebuffer, nullptr);
         }
 
-        uint32_t presentModeCount;
-        vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
+        vkDestroyPipeline(device, graphicsPipeline, nullptr);
+        vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
 
-        if (presentModeCount != 0) {
-            details.presentModes.resize(presentModeCount);
-            vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, details.presentModes.data());
+        vkDestroyRenderPass(device, renderPass, nullptr);
+
+        for (auto imageView : swapChainImageViews) {
+            vkDestroyImageView(device, imageView, nullptr);
         }
 
-        return details;
+        vkDestroySwapchainKHR(device, swapChain, nullptr);
     }
 
-    bool isDeviceSuitable(VkPhysicalDevice device) {
-        QueueFamilyIndices indices = findQueueFamilies(device);
+    void cleanup() {
+        cleanupSwapChain();
 
-        bool extensionsSupported = checkDeviceExtensionSupport(device);
-
-        bool swapChainAdequate = false;
-        if (extensionsSupported) {
-            SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device);
-            swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            vkDestroyBuffer(device, vertexUniformBuffers[i], nullptr);
+            vkFreeMemory(device, vertexUniformBuffersMemory[i], nullptr);
+            vkDestroyBuffer(device, fragmentUniformBuffers[i], nullptr);
+            vkFreeMemory(device, fragmentUniformBuffersMemory[i], nullptr);
         }
 
-        VkPhysicalDeviceFeatures supportedFeatures;
-        vkGetPhysicalDeviceFeatures(device, &supportedFeatures);
+        vkDestroyDescriptorPool(device, descriptorPool, nullptr);
 
-        return indices.isComplete() && extensionsSupported && swapChainAdequate  && supportedFeatures.samplerAnisotropy;
-    }
+        vkDestroySampler(device, textureSampler, nullptr);
+        vkDestroyImageView(device, textureImageView, nullptr);
+        vkDestroyImage(device, textureImage, nullptr);
+        vkFreeMemory(device, textureImageMemory, nullptr);
 
-    bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
-        uint32_t extensionCount;
-        vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+        vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 
-        std::vector<VkExtensionProperties> availableExtensions(extensionCount);
-        vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
+            vkDestroyBuffer(device, indexBuffer[i], nullptr);
+            vkFreeMemory(device, indexBufferMemory[i], nullptr);
 
-        std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
+            vkDestroyBuffer(device, vertexBuffer[i], nullptr);
+            vkFreeMemory(device, vertexBufferMemory[i], nullptr);
 
-        for (const auto& extension : availableExtensions) {
-            requiredExtensions.erase(extension.extensionName);
+            vkDestroyBuffer(device, waterIndexBuffer[i], nullptr);
+            vkFreeMemory(device, waterIndexBufferMemory[i], nullptr);
+
+            vkDestroyBuffer(device, waterVertexBuffer[i], nullptr);
+            vkFreeMemory(device, waterVertexBufferMemory[i], nullptr);
         }
 
-        return requiredExtensions.empty();
-    }
-
-    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) {
-        QueueFamilyIndices indices;
-
-        uint32_t queueFamilyCount = 0;
-        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
-
-        std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
-
-        int i = 0;
-        for (const auto& queueFamily : queueFamilies) {
-            if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-                indices.graphicsFamily = i;
-            }
-
-            VkBool32 presentSupport = false;
-            vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
-
-            if (presentSupport) {
-                indices.presentFamily = i;
-            }
-
-            if (indices.isComplete()) {
-                break;
-            }
-
-            i++;
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
+            vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
+            vkDestroyFence(device, inFlightFences[i], nullptr);
         }
 
-        return indices;
-    }
+        vkDestroyCommandPool(device, commandPool, nullptr);
 
-    std::vector<const char*> getRequiredExtensions() {
-        uint32_t glfwExtensionCount = 0;
-        const char** glfwExtensions;
-        glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-
-        std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+        vkDestroyDevice(device, nullptr);
 
         if (enableValidationLayers) {
-            extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+            DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
         }
 
-        return extensions;
+        vkDestroySurfaceKHR(instance, surface, nullptr);
+        vkDestroyInstance(instance, nullptr);
+
+        glfwDestroyWindow(window);
+
+        glfwTerminate();
     }
 
-    bool checkValidationLayerSupport() {
-        uint32_t layerCount;
-        vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+    //// ===== Custom control functions =====
 
-        std::vector<VkLayerProperties> availableLayers(layerCount);
-        vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+    // Moves the sun in the higher position
+    void setTimeNoon() {
+        sunDir = glm::vec3(0, 1, 0);
+    }
 
-        for (const char* layerName : validationLayers) {
-            bool layerFound = false;
+    // Moves the sun in the lower position
+    void setTimeMidnight() {
+        sunDir = glm::vec3(0, -1, 0);
+    }
 
-            for (const auto& layerProperties : availableLayers) {
-                if (strcmp(layerName, layerProperties.layerName) == 0) {
-                    layerFound = true;
-                    break;
-                }
-            }
+    // Toggles [cursorEnabled] and the ability to interact with the application
+    void toggleCursor() {
+        if(cursorEnabled) {
+            cursorEnabled = false;
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        } else {
+            cursorEnabled = true;
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        }
+    }
+    
+    // Reacts to a mouse click event (if any)
+    // Returns true if the event caused some update
+    bool handleMouseClicks(std::unordered_set<glm::ivec3>* chunkIndexesToAdd) {
+        static bool leftPressed = false;
+        static bool rightPressed = false;
 
-            if (!layerFound) {
-                return false;
+        bool shouldRedraw = false;
+
+        if(!leftPressed && !rightPressed) {
+            if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+                leftPressed = true;
+                shouldRedraw = handleMouseClick(false, chunkIndexesToAdd);
+            } else if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS) {
+                rightPressed = true;
+                shouldRedraw = handleMouseClick(true, chunkIndexesToAdd); 
             }
         }
 
+        if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE) {
+            leftPressed = false;
+        }
+        if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_RELEASE) {
+            rightPressed = false;
+        }
+
+        return shouldRedraw;
+    }
+
+    // If [isRight] is false, destroys the block that the player is looking at
+    // If [isRight] is true, places a block near the one that the player is looking at
+    // Returns true if a block was destroyed or placed
+    bool handleMouseClick(bool isRight, std::unordered_set<glm::ivec3>* chunkIndexesToAdd) {
+        glm::ivec3 target;
+        glm::vec3 norm;
+        if(!rayTracePlayer(target, norm)) return false;
+
+        if(isRight) target += norm;     // The real target is the adjacent block
+
+        glm::ivec3 baseChunkIndex = Chunk::findChunkIndex(target);
+        Chunk* chunk = chunkMap.find(baseChunkIndex)->second;
+        glm::ivec3 blockIndex = Chunk::findBlockIndex(target);
+
+        if(!isRight && !chunk->destroyLocal(blockIndex)) return false;
+        if(isRight && !chunk->placeLocal(blockIndex)) return false;
+        chunkIndexesToAdd->insert(baseChunkIndex);
+
+        std::vector<Chunk*> toBuild = { chunk };
+        bool waterSpreaded = isRight || spreadWater(chunk, chunk, target, target + glm::ivec3(0, 1, 0));
+
+        const std::vector<glm::ivec3> directions = {
+            glm::ivec3(1, 0, 0),
+            glm::ivec3(-1, 0, 0),
+            glm::ivec3(0, 0, 1),
+            glm::ivec3(0, 0, -1),
+        };
+
+        for(auto direction : directions) {
+            glm::ivec3 source = target + direction;
+            glm::ivec3 nearChunkIndex = Chunk::findChunkIndex(source);
+            glm::ivec3 nearIndex = Chunk::findBlockIndex(source);
+
+            Chunk* neighbor;
+            if(nearChunkIndex != baseChunkIndex) {
+                neighbor = chunkMap.find(nearChunkIndex)->second;
+                toBuild.push_back(neighbor);
+            } else {
+                neighbor = chunk;
+            }
+            
+            waterSpreaded = waterSpreaded || spreadWater(chunk, neighbor, blockIndex, nearIndex);
+        }
+
+        for (auto& chunk : toBuild) chunk->build();
         return true;
     }
 
-    static std::vector<char> readFile(const std::string& filename) {
-        std::ifstream file(filename, std::ios::ate | std::ios::binary);
+    // Traces the line of sight of the player and fills [target] and [norm] with 
+    // the details of the hit
+    // Returns true if a hit occurred
+    bool rayTracePlayer(glm::ivec3 &target, glm::vec3 &norm) {
+        Camera camera = player.getCamera();
+        glm::vec3 position = camera.getPosition();
+        glm::vec3 direction = camera.getDirection() * -1.f;
 
-        if (!file.is_open()) {
-            throw std::runtime_error("failed to open file!");
-        }
-
-        size_t fileSize = (size_t) file.tellg();
-        std::vector<char> buffer(fileSize);
-
-        file.seekg(0);
-        file.read(buffer.data(), fileSize);
-
-        file.close();
-
-        return buffer;
+        return TraceRay::trace(
+            [&](glm::ivec3 position) -> bool {
+                glm::ivec3 baseChunkIndex = Chunk::findChunkIndex(position);
+                Chunk* chunk = chunkMap.find(baseChunkIndex)->second;
+                return chunk->isBlockBreakableGlobal(position);
+            },
+            position, direction, ACTION_RANGE, 
+            target, norm
+        );
     }
 
-    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData) {
-        std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
+    // Tries to spread water from [sourceBlock] to [emptyBlock]
+    // Returns true if [emptyBlock] was filled
+    bool spreadWater(Chunk* emptyChunk, Chunk* sourceChunk, glm::ivec3 emptyBlock, glm::ivec3 sourceBlock) {
+        if (!sourceChunk->isBlockWaterLocal(sourceBlock)) return false;
+        emptyChunk->spreadWater(emptyBlock);
+        return true;
+    }
 
-        return VK_FALSE;
+    // Loads the new visible chunks in [chunksIndexesToAdd] and [toBuild]
+    // Returns true if the player entered a new chunk
+    bool loadNewVisibleChunks(std::unordered_set<glm::ivec3>* chunkIndexesToAdd, std::unordered_set<Chunk*>* toBuild) {
+        static glm::ivec3 oldChunkIndex(-1, 0, -1);     // Any value different from (0, 0, 0) should be fine
+        glm::ivec3 baseChunkIndex = Chunk::findChunkIndex(player.getCamera().getPosition());
+
+        if (oldChunkIndex != baseChunkIndex) {
+            oldChunkIndex = baseChunkIndex;
+            for (int i = -VIEW_RANGE; i <= VIEW_RANGE; ++i) {
+                for (int j = -VIEW_RANGE; j <= VIEW_RANGE; ++j) {
+                    glm::ivec3 curChunkIndex(baseChunkIndex.x + i * CHUNK_WIDTH, baseChunkIndex.y, baseChunkIndex.z + j * CHUNK_DEPTH);
+                    if (chunkMap.find(curChunkIndex) == chunkMap.end()) {
+                        if (chunkIndexesToAdd->find(curChunkIndex) == chunkIndexesToAdd->end()) {
+                            chunkIndexesToAdd->insert(curChunkIndex);
+                            Chunk* newChunk = new Chunk(curChunkIndex, chunkMap);
+                            chunkMap.insert({ curChunkIndex, newChunk });
+                            toBuild->insert(newChunk);
+                            std::vector<std::pair<glm::ivec3, Chunk*>> neighbors = newChunk->getNeighbors();
+                            for (auto& c : neighbors) {
+                                toBuild->insert(c.second);
+                            }
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    // Builds the first chunk in [toBuild]
+    // Returns false if no build occurred
+    bool buildNextChunk(std::unordered_set<Chunk*>* toBuild) {
+        if(toBuild->empty()) return false;
+
+        auto curChunkIter = toBuild->begin();
+        Chunk* curChunk = *curChunkIter;
+        toBuild->erase(curChunkIter);
+        curChunk->build();
+        return true;
+    }
+
+    // Initializes and builds the first chunks
+    void initializeChunks() {
+        const glm::ivec3 baseChunkIndex = glm::ivec3(0, 0, 0);
+
+        Chunk::setSeed(rand());
+        chunkMap.insert(std::pair(baseChunkIndex, new Chunk(baseChunkIndex, chunkMap)));
+        
+        for (int i = -VIEW_RANGE; i <= VIEW_RANGE; ++i) {
+            for (int j = -VIEW_RANGE; j <= VIEW_RANGE; ++j) {
+                glm::ivec3 curChunkIndex(baseChunkIndex.x + i * CHUNK_WIDTH, baseChunkIndex.y, baseChunkIndex.z + j * CHUNK_DEPTH);
+                chunkMap.insert(std::pair(curChunkIndex, new Chunk(curChunkIndex, chunkMap)));
+            }
+        }
+
+        for (auto& iter : chunkMap) {
+            iter.second->build();
+        }
+    }
+
+    // Gets the visible chunks from [chunkMap] and draws them
+    void drawVisibleChunks() {
+        const glm::ivec3 baseChunkIndex = Chunk::findChunkIndex(player.getCamera().getPosition());
+        std::vector<Chunk*> visibleChunks;
+        
+        for (int i = -VIEW_RANGE; i <= VIEW_RANGE; ++i) {
+            for (int j = -VIEW_RANGE; j <= VIEW_RANGE; ++j) {
+                glm::ivec3 curChunkIndex(baseChunkIndex.x + i * CHUNK_WIDTH, baseChunkIndex.y, baseChunkIndex.z + j * CHUNK_DEPTH);
+                auto iter = chunkMap.find(curChunkIndex);
+                if (iter != chunkMap.end()) {
+                    visibleChunks.push_back(iter->second);
+                }
+            }
+        }
+
+        clearBuffers();
+        for (auto& iter : visibleChunks) {
+            drawChunk(iter);
+        }
+    }
+
+    /// Clears the global vertex and index buffers
+    void clearBuffers() {
+        vertices.clear();
+        indices.clear();
+        waterVertices.clear();
+        waterIndices.clear();
+        waterVertices.resize(1);
+        waterIndices.resize(3);
+    }
+
+    // Inserts [newChunk] vertices and indices in the global buffers
+    void drawChunk(Chunk* newChunk) {
+        std::vector<BlockVertex> curVertices = newChunk->getVertices();
+        std::vector<uint32_t> curIndices = newChunk->getIndices();
+
+        indices.reserve(indices.size() + curIndices.size());
+        for (int i = 0; i < curIndices.size(); ++i) {
+            indices.push_back(curIndices[i] + vertices.size());
+        }
+        vertices.insert(vertices.end(), curVertices.begin(), curVertices.end());
+
+        std::vector<BlockVertex> curWaterVertices = newChunk->getWaterVertices();
+        std::vector<uint32_t> curWaterIndices = newChunk->getWaterIndices();
+
+        waterIndices.reserve(waterIndices.size() + curWaterIndices.size());
+        for (int i = 0; i < curWaterIndices.size(); ++i) {
+            waterIndices.push_back(curWaterIndices[i] + waterVertices.size());
+        }
+        waterVertices.insert(waterVertices.end(), curWaterVertices.begin(), curWaterVertices.end());
     }
 };
 
