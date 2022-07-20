@@ -63,7 +63,7 @@ void main() {
 	vec3 specularColor = vec3(clamp(sign(fragMaterial.z), 0, 0.5));
 
 	vec4 torchParams = vec4(cos(radians(15)), cos(radians(30)), 2.0, 1.4);
-	vec3 torchColor = spot_light_color(fragPos, gubo.eyeDir, gubo.eyePos, vec3(255, 215, 0) / 255, torchParams);
+	vec3 torchColor = spot_light_color(fragPos, gubo.eyeDir, vec3(gubo.eyePos.x, gubo.eyePos.y-0.5f, gubo.eyePos.z), vec3(255, 215, 0) / 255, torchParams);
 	float torchOn = max(0, sign(gubo.moonLightDir.y));	// The torch is on only at night (when the moon is over the horizon)
 
 	vec4 pointerParams = vec4(cos(0.002f), cos(0.005f), 1, 1);
