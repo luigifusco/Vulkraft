@@ -72,6 +72,8 @@ class Chunk {
 		std::vector<uint32_t> waterIndices;
 		const std::unordered_map<glm::ivec3, Chunk*>& chunkMap;
 
+		BlockType* selectedType = (BlockType *) WOOD_PLANK;
+
 		std::vector<Direction> getVisibleFaces(int x, int y, int z, bool opaqueOnly);
 
 		void buildBlockFace(int x, int y, int z, Direction dir, bool opaqueOnly);
@@ -132,4 +134,6 @@ class Chunk {
 		bool isBlockWaterGlobal(glm::ivec3 position);
 
 		void spreadWater(glm::ivec3 position);
+
+		bool selectBlockType(glm::ivec3 position);
 };

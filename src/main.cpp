@@ -2028,16 +2028,20 @@ private:
     bool handleMouseClicks(std::unordered_set<glm::ivec3>* chunkIndexesToAdd) {
         static bool leftPressed = false;
         static bool rightPressed = false;
+        static bool middlePressed = false;
 
         bool shouldRedraw = false;
 
-        if(!leftPressed && !rightPressed) {
+        if(!leftPressed && !rightPressed && !middlePressed) {
             if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
                 leftPressed = true;
-                if(handleMouseClick(false, chunkIndexesToAdd)) shouldRedraw = true;
+                if(handleMouseClick(GLFW_MOUSE_BUTTON_LEFT, chunkIndexesToAdd)) shouldRedraw = true;
             } else if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS) {
                 rightPressed = true;
-                if(handleMouseClick(true, chunkIndexesToAdd)) shouldRedraw = true; 
+                if(handleMouseClick(GLFW_MOUSE_BUTTON_RIGHT, chunkIndexesToAdd)) shouldRedraw = true; 
+            } else if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS) {
+                middlePressed = true;
+                handleMouseClick(GLFW_MOUSE_BUTTON_MIDDLE, chunkIndexesToAdd);
             }
         }
 
@@ -2047,6 +2051,9 @@ private:
         if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_RELEASE) {
             rightPressed = false;
         }
+        if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_RELEASE) {
+            middlePressed = false;
+        }
 
         return shouldRedraw;
     }
@@ -2054,23 +2061,24 @@ private:
     // If [isRight] is false, destroys the block that the player is looking at
     // If [isRight] is true, places a block near the one that the player is looking at
     // Returns true if a block was destroyed or placed
-    bool handleMouseClick(bool isRight, std::unordered_set<glm::ivec3>* chunkIndexesToAdd) {
+    bool handleMouseClick(int button, std::unordered_set<glm::ivec3>* chunkIndexesToAdd) {
         glm::ivec3 target;
         glm::vec3 norm;
         if(!rayTracePlayer(target, norm)) return false;
 
-        if(isRight) target += norm;     // The real target is the adjacent block
+        if(button == GLFW_MOUSE_BUTTON_RIGHT) target += norm;     // The real target is the adjacent block
 
         glm::ivec3 baseChunkIndex = Chunk::findChunkIndex(target);
         Chunk* chunk = chunkMap.find(baseChunkIndex)->second;
         glm::ivec3 blockIndex = Chunk::findBlockIndex(target);
 
-        if(!isRight && !chunk->destroyLocal(blockIndex)) return false;
-        if(isRight && !chunk->placeLocal(blockIndex)) return false;
+        if(button == GLFW_MOUSE_BUTTON_LEFT && !chunk->destroyLocal(blockIndex)) return false;
+        if(button == GLFW_MOUSE_BUTTON_RIGHT && !chunk->placeLocal(blockIndex)) return false;
+        if(button == GLFW_MOUSE_BUTTON_MIDDLE) return chunk->selectBlockType(blockIndex);
         chunkIndexesToAdd->insert(baseChunkIndex);
 
         std::vector<Chunk*> toBuild = { chunk };
-        bool waterSpreaded = isRight || spreadWater(chunk, chunk, target, target + glm::ivec3(0, 1, 0));
+        bool waterSpreaded = button == GLFW_MOUSE_BUTTON_RIGHT || spreadWater(chunk, chunk, target, target + glm::ivec3(0, 1, 0));
 
         const std::vector<glm::ivec3> directions = {
             glm::ivec3(1, 0, 0),

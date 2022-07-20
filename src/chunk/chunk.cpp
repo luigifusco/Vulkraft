@@ -415,7 +415,7 @@ bool Chunk::destroyGlobal(glm::ivec3 position) {
 bool Chunk::placeLocal(glm::ivec3 position) {
     Block* block = &blocks[position.x][position.y][position.z];
     if(block->type->isSolid) return false;
-    block->type = (BlockType*) WOOD_PLANK;
+    block->type = selectedType;
     return true;
 }
 
@@ -435,4 +435,9 @@ bool Chunk::isBlockWaterGlobal(glm::ivec3 position) {
 
 void Chunk::spreadWater(glm::ivec3 position) {
     blocks[position.x][position.y][position.z].type = (BlockType*) WATER;
+}
+
+bool Chunk::selectBlockType(glm::ivec3 position) {
+    selectedType = blocks[position.x][position.y][position.z].type;
+    return false;
 }
